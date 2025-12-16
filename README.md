@@ -4,4 +4,4 @@
 1 2 +
 ```
 
-* A stack based rpn language written in javascript :0
+* A stack based rpn language
