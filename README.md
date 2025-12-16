@@ -1,10 +1,11 @@
 # oh
 
+* A stack rpn language
+
 ```oh
 1 2 +
 ```
 
-* A stack rpn language
 
 It's a javascript file that you can download and run in browser or in node:
 
@@ -14,12 +15,15 @@ https://vms14.github.io/oh.js
 
 ## Usage:
 
+* In node it launches a read eval print loop that prints the contents of the stack
+
 ```bash
 node oh.js
 1 2 +
 [ 3 ]
 ```
-* In node it launches a read eval print loop that prints the contents of the stack
+
+* In the browser it loads an executes <oh> tags after the document loads
 
 ```html
 <!DOCTYPE html>
@@ -32,18 +36,17 @@ node oh.js
 </body>
 </html>
 ```
-
-* In the browser it loads an executes <oh> tags after the document loads
+* If the tags have a src attribute it will fetch then and evaluate it
 
 ```html
 <oh src="oh.oh"></oh>
 ```
 
-* If the tags have a src attribute it will fetch then and evaluate it
+* If a tag has both a src attribute and code inside it, the src file will get fetched and evaluated first, after that then the code inside the tag will be evaluated
 
 ```html
 <oh src="oh.oh"> 1 2 + </oh>
 ```
 
-* If a tag has both a src attribute and code inside it, the src file will get fetched and evaluated first, after that then the code inside the tag will evaluate
+
 
