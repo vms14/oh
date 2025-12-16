@@ -1,4 +1,4 @@
-# Name: oh  ohlang
+# oh
 
 * A stack rpn language
 
