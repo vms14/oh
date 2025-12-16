@@ -10,8 +10,6 @@
 It's a javascript file that you can download and run in browser or in node:
 
 https://raw.githubusercontent.com/vms14/oh/refs/heads/main/oh.js
-or
-https://vms14.github.io/oh.js
 
 ## Usage:
 
