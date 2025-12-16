@@ -4,4 +4,4 @@
 1 2 +
 ```
 
-* A stack based rpn language
+* A stack rpn language
