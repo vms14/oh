@@ -1,0 +1,237 @@
+Concise Language: Core Word Reference
+
+This document serves as a comprehensive reference guide to the built-in words of the "Concise Language," a stack-based, concatenative programming language. To facilitate learning and understanding, the words are grouped by their primary functionality. Each entry provides a clear description of the word's purpose and its effect on the data stack, which is represented in the format ( before -- after ).
+
+
+--------------------------------------------------------------------------------
+
+
+1. Core Language & Control Flow
+
+These are the most fundamental words in the language, forming the essential building blocks for any application. They control the program's execution flow, enable the definition of new functionality, and provide the basic structure for all code.
+
+* : ( -- ) Defines a new word in the current environment; it reads the next word from the source as the name and compiles all subsequent words until a semicolon (;) as its definition. Words defined with : execute in the caller's environment and new words defined within them are added to a new child environment, following a prototypal chain.
+* defun ( -- ) Defines a new function that, when executed, runs within a new, isolated child environment. This creates a new lexical scope; the function will always execute in the environment in which it was defined, not the caller's environment.
+* if ( -- ) Begins a conditional block; it first compiles and executes words up to then for the condition, then executes the code between then and else if the condition was true, or between else and end if it was false.
+* else ( -- ) A keyword used within an if block to separate the true branch from the false branch; causes an error if used outside of an if block.
+* end ( -- ) A keyword that terminates an if or case block; causes an error if used improperly.
+* case ( value -- ) Implements a multi-way conditional (switch statement) that executes a code block associated with a matching value popped from the stack.
+* eval ( item -- ? ) Pops any item from the stack, compiles it if necessary, and immediately executes the resulting operation.
+* eval-string ( string -- ? ) Pops a string from the stack, compiles it, and immediately executes the resulting code.
+* compile ( item -- function ) Pops an item (string or list) from the stack and pushes its compiled, executable function representation back onto the stack.
+* compile-string ( string -- function ) Pops a string, compiles it, and pushes the resulting executable function onto the stack.
+* block ( -- function ) Compiles a sequence of words until end and pushes the resulting function onto the stack, which executes in a new, isolated environment.
+* { ( -- quotation ) Compiles a sequence of words until } and pushes a quotation (a function that pushes the compiled code block to the stack when called) to the stack.
+* nop ( -- ) An operation that does nothing.
+* --- ( -- ) Marks the beginning of a single-line comment; the interpreter ignores all text until the next newline.
+
+With these core control structures defined, we can now examine the words used to directly manage the data on the stack, which provides the input for all operations.
+
+
+--------------------------------------------------------------------------------
+
+
+2. Stack Manipulation
+
+In a stack-based language, direct manipulation of the data stack is a primary method of data management. These words provide the essential tools for ordering, duplicating, and removing data to prepare it for other operations.
+
+* dup ( a -- a a ) Duplicates the top element of the stack.
+* swap ( a b -- b a ) Swaps the top two elements of the stack.
+* drop ( a -- ) Removes the top element from the stack.
+* 2drop ( a b -- ) Removes the top two elements from the stack.
+* 3drop ( a b c -- ) Removes the top three elements from the stack.
+* 4drop ( a b c d -- ) Removes the top four elements from the stack.
+* r ( ... -- ) Resets the stack, clearing all of its contents.
+* flatten ( [a b c] -- a b c ) Pops an array from the stack and pushes each of its elements onto the stack individually.
+
+With the stack correctly ordered, these arithmetic words can now perform calculations with predictable inputs.
+
+
+--------------------------------------------------------------------------------
+
+
+3. Arithmetic Operations
+
+This section covers the standard mathematical functions for performing calculations. These words operate on numeric values popped from the stack and push the result back for further use.
+
+* + ( a b -- sum ) Pops two numbers from the stack and pushes their sum.
+* - ( a b -- difference ) Pops two numbers (a, b) from the stack and pushes their difference (a - b).
+* * ( a b -- product ) Pops two numbers from the stack and pushes their product.
+* / ( a b -- quotient ) Pops two numbers (a, b) from the stack and pushes their quotient (a / b).
+* % ( a b -- remainder ) Pops two numbers (a, b) from the stack and pushes the remainder of their division (a % b).
+
+While these words perform stateless calculations, most applications require managing information over time. The next set of words introduces state through variables and memory operations.
+
+
+--------------------------------------------------------------------------------
+
+
+4. Variable & Memory Operations
+
+These words are used to manage state, representing a departure from a purely functional, stack-based paradigm. They provide the ability to create named references (variables), bind values to them, and generate functions that can mutate those values directly. Note that many of these words are "higher-order"; they do not perform an action immediately but instead compile and push a new function to the stack, which can then be executed or assigned.
+
+* declare ( -- ) Reads a name (or a list of names) from the source and creates a variable with an initial value of 0 in the current environment.
+* bind ( -- function ) Reads a name (or list of names) and pushes a function to the stack that, when called, will pop a value (or values) and assign it to the bound variable(s).
+* get ( -- function ) A higher-order word that reads a variable name or property accessor and creates a function that, when executed, pushes the corresponding value to the stack.
+* set ( -- function ) A higher-order word that reads a variable name or property accessor and creates a function that, when executed, pops a value from the stack and assigns it to the target.
+* increment ( -- function ) A higher-order word that creates a function to increment a target variable or property by a value popped from the stack.
+* decrement ( -- function ) A higher-order word that creates a function to decrement a target variable or property by a value popped from the stack.
+* increment-by-one ( -- function ) A higher-order word that creates a function to increment a target variable or property by one.
+* decrement-by-one ( -- function ) A higher-order word that creates a function to decrement a target variable or property by one.
+
+Managing individual values is essential, but complex programs are built upon structured data. The following words provide the tools to create and manipulate the language's core data structures.
+
+
+--------------------------------------------------------------------------------
+
+
+5. Data Structures: Lists, Objects, and Strings
+
+This section covers the words that create, manipulate, and inspect the language's primary data structures. These include lists for ordered collections, objects for key-value pairs, and strings for handling text. A fundamental concept here is the "quotation," which is a function that, when executed, pushes a literal value (like a list or string) onto the stack. This allows data to be treated as code and vice versa.
+
+5.1 Lists
+
+* ( ( -- quotation ) Parses a literal list from the source code (terminated by )) and pushes a quotation that, when called, places the list onto the stack.
+* list ( ... n -- [...] ) Pops a number n from the stack, then pops the next n items and pushes them back as a single array.
+
+5.2 Objects
+
+* object ( [key1, val1, key2, val2...] -- {object} ) Pops a single list of key-value pairs and pushes a corresponding object.
+* obj ( val1 val2... [key1 key2...] -- {object} ) Pops a list of keys and an equal number of values from the stack, then pushes an object constructed from them.
+* keys ( {object} -- [keys] ) Pops an object and pushes an array of its keys.
+* values ( {object} -- [values] ) Pops an object and pushes an array of its values.
+* entries ( {object} -- [[key, value]] ) Pops an object and pushes an array of its [key, value] pairs.
+* get-property ( {object} "property" -- value ) Pops an object and a property name string, then pushes the value of that property.
+* properties ( {object} [p1 p2 ...] -- v1 v2 ... ) Pops an object and a list of property names, then pushes the value of each requested property onto the stack in order.
+* random-key ( {object} -- key ) Pops an object and pushes one of its keys, chosen at random.
+
+5.3 Strings
+
+* " ( -- quotation ) Parses a double-quoted string literal from the source and pushes a quotation that, when called, places the string onto the stack.
+* ` ( -- quotation ) Parses a back-ticked string literal from the source and pushes a quotation that, when called, places the string onto the stack.
+* .. ( a b -- sum ) Pops two numbers from the stack and pushes their sum. Note: This word is an alias for + and behaves identically, performing numeric addition or string concatenation depending on the types.
+* uppercase ( "string" -- "STRING" ) Pops a string and pushes its uppercase equivalent.
+* lowercase ( "STRING" -- "string" ) Pops a string and pushes its lowercase equivalent.
+* remove-characters ( "string" [chars] -- "new_string" ) Pops a string and a list of characters, then pushes a new string with all specified characters removed.
+
+5.4 Interpolation
+
+* @ ( val1 val2... [list] -- [interpolated_list] ) Pops a list and interpolates it by replacing , markers with values from the stack, then pushes the new list.
+
+Once these data structures are populated, they must be processed. The next section details the words designed for iterating over collections and sequences.
+
+
+--------------------------------------------------------------------------------
+
+
+6. Iteration & Iterators
+
+These words provide the mechanisms for processing collections. They allow for the repeated execution of a block of code over each element in a list or provide tools for controlled navigation through a sequence.
+
+* iterate ( [list] function -- ) Pops a list and a function, then executes the function for each element in the list, pushing the current element onto the stack before each call.
+* iterator ( [list] -- iterator_obj ) Pops a list and pushes an iterator object that tracks a position within that list.
+* next-element ( iterator_obj -- element ) Pops an iterator, advances its position (wrapping around at the end), and pushes the element at the new position.
+* previous-element ( iterator_obj -- element ) Pops an iterator, moves its position back (wrapping around at the beginning), and pushes the element at the new position.
+* random-element ( iterator_obj -- element ) Pops an iterator, sets its position to a random index, and pushes the element at that position.
+
+Iteration is ideal for processing data that is immediately available. For handling operations that take time, such as network requests or user input, the language provides asynchronous tools.
+
+
+--------------------------------------------------------------------------------
+
+
+7. Asynchronous Programming
+
+These words enable non-blocking operations, which are essential for handling tasks like network requests, timers, and animations without freezing the application. They provide the tools to manage promises and deferred execution.
+
+* wait ( -- ) Switches the interpreter into asynchronous mode, allowing it to automatically await promises that appear on top of the stack during function execution.
+* no-wait ( -- ) Switches the interpreter back to the default synchronous execution mode.
+* promise ( -- quotation ) Creates a new Promise and pushes a quotation to the stack; the code within the promise block can use the locally defined resolve and reject words.
+* fetch ( "url" -- promise ) Pops a URL string, initiates a network request using the browser's Fetch API, and pushes the resulting Promise.
+* interval ( -- function ) Reads a time (in milliseconds) and a code block from the source, and pushes a function to the stack that, when called, starts a recurring timer executing the code.
+* timeout ( -- function ) Reads a time (in milliseconds) and a code block from the source, and pushes a function that, when called, starts a one-time timer to execute the code.
+
+As asynchronous programs grow in scale, organizing code into reusable and isolated units becomes paramount. Modules and scoping words provide the necessary mechanisms for this encapsulation.
+
+
+--------------------------------------------------------------------------------
+
+
+8. Modules & Scoping
+
+These words provide powerful tools for code organization, encapsulation, and creating lexical closures. They allow for the construction of modular and maintainable applications by managing environments and controlling the visibility of words.
+
+* module ( -- ) Creates a new, named environment (a module) and populates it with the words defined within its block.
+* import ( module_env -- ) Pops a module environment from the stack and copies a specific word (or list of words) from it into the current environment.
+* import-all ( module_env -- ) Pops a module environment from the stack and copies all of its words into the current environment.
+* lambda ( -- quotation ) Compiles a code block and pushes a quotation to the stack that, when called, pushes a new function (a closure) which executes the code within the environment where the lambda was defined.
+
+With a solid foundation in code organization, we can now explore the specific APIs that connect the language to its primary execution environment: the web browser.
+
+
+--------------------------------------------------------------------------------
+
+
+9. Browser & DOM API
+
+These words form the bridge between the language and the web browser. They provide a high-level API for manipulating the Document Object Model (DOM), handling user events, drawing on a canvas, and interacting with other browser features.
+
+9.1 Document & Window
+
+* window ( -- window_obj ) Pushes the browser's global window object to the stack.
+* document ( -- document_obj ) Pushes the browser's document object to the stack.
+* body ( -- body_element ) Pushes the document.body element to the stack.
+* params ( -- URLSearchParams_obj ) Pushes a URLSearchParams object created from the current page's query string.
+* query ( -- {object} ) Pushes an object containing the key-value pairs from the current page's query string.
+* alert ( message -- ) Pops a value and displays it in a browser alert() dialog.
+
+9.2 DOM Creation & Manipulation
+
+* element ( "tag" -- element ) Pops a tag name string and pushes a newly created DOM element of that type.
+* dom ( [list] -- element ) Pops a list representing a DOM tree structure and pushes the fully constructed DOM element.
+* append ( child parent -- ) Pops a child element and a parent element, then appends the child to the parent.
+* to-body ( element -- ) Pops a DOM element (or an array of elements) and appends it to the document body.
+
+9.3 Event Handling
+
+* handler ( -- function ) Creates an event handler function; the associated code block can access the event object via the event word.
+
+9.4 Styling & CSS
+
+* style ( [css_rules] -- ) Pops a list-based representation of CSS rules and sets it as the content of a user-defined style sheet, replacing previous content.
+* style-append ( [css_rules] -- ) Pops a list-based representation of CSS rules and appends it to the user-defined style sheet.
+* add-font ( "type" "url" -- ) Pops a font type and URL, then adds the specified font to the document.
+* css ( [css_rules] -- "css_string" ) Pops a list-based representation of CSS and pushes the compiled CSS string.
+
+9.5 Canvas & Graphics
+
+* make-canvas ( -- ) Creates a full-screen canvas element, appends it to the body, and sets it as the active drawing context.
+* canvas ( -- canvas_element ) Pushes the currently active canvas element to the stack.
+* set-ctx ( canvas_element -- ) Pops a canvas element and sets its 2D rendering context as the active context for drawing operations.
+* clear ( -- ) Clears the entire active canvas.
+* rectangle ( x y width height -- ) Pops four numbers and draws a filled rectangle on the canvas at the specified coordinates and dimensions.
+* color ( "color_string" -- ) Pops a string and sets the fillStyle for canvas drawing operations.
+* animation ( function -- ) Pops a function and runs it in a continuous loop using requestAnimationFrame.
+
+9.6 Media
+
+* image ( "url" -- promise ) Pops an image URL and pushes a Promise that resolves with the loaded image element.
+* images ( ["url1", "url2"] -- promise ) Pops a list of image URLs and pushes a Promise that resolves with an array of the loaded image elements.
+
+Building complex browser-based applications inevitably requires debugging. The final set of words provides essential tools for introspection and understanding the program's runtime state.
+
+
+--------------------------------------------------------------------------------
+
+
+10. Introspection & Debugging
+
+These words are essential tools for developers to understand the state of their program. They provide ways to inspect the stack, log information to the console, and trace execution flow, all of which are critical for building and troubleshooting complex applications.
+
+* s ( -- ) Logs a snapshot of the current stack contents to the console without modifying it.
+* log ( a -- ) Pops the top element from the stack and logs it to the console.
+* trace ( -- ) Activates trace mode, which logs each word and the state of the stack after its execution.
+* no-trace ( -- ) Deactivates trace mode, returning to normal compilation.
+* find ( "word_name" -- function ) Pops a string, searches for a word with that name in the current environment chain, and pushes its function definition (or undefined if not found).
+* console ( -- console_obj ) Pushes the browser's console object onto the stack.
+* random ( item -- random_item ) Pops an array, object, or number; if an array, pushes a random element; if an object, a random value; if a number n, a random integer from 0 to n-1.

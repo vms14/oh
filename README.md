@@ -47,7 +47,7 @@ node oh.js
 
 ## AI generated documentation:
 
-* [Word list](https://github.com/vms14/oh/blob/main/words.md)
+* [Word list](https://github.com/vms14/oh/blob/main/words.txt)
 * [Overview](https://github.com/vms14/oh/blob/main/overview.md)
 * [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.md)
 
