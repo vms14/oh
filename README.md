@@ -47,6 +47,6 @@ node oh.js
 
 ## AI generated documentation:
 
-* [Overview](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/overview.md)
+* [Overview](https://github.com/vms14/oh/blob/main/overview.md)
 * [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.md)
 
