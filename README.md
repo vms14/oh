@@ -20,7 +20,7 @@ node oh.js
 [ 3 ]
 ```
 
-* In the browser it loads an executes <oh> tags after the document loads
+* In the browser it loads an executes `<oh></oh>` tags after the document loads
 
 ```html
 <!DOCTYPE html>
