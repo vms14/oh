@@ -56,5 +56,6 @@ node oh.js
 
 ## Documentation:
 
-
+[Tutorial](https://github.com/vms14/oh/blob/main/TUTORIAL.md)
+[Internals](https://github.com/vms14/oh/blob/main/INTERNALS.md)
 
