@@ -45,8 +45,8 @@ node oh.js
 <oh src="oh.oh"> 1 2 + </oh>
 ```
 
-## Documentation:
+## AI generated documentation:
 
-* [Tutorial](https://github.com/vms14/oh/blob/main/TUTORIAL.md)
-* [Internals](https://github.com/vms14/oh/blob/main/INTERNALS.md)
+* [Tutorial](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/tutorial.txt)
+* [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.txt)
 
