@@ -59,6 +59,6 @@ node oh.js
 
 * The bots talk about an example application which is a site to show random bible verses
 
-The code they mention can be seen at https://vms14.github.io/bible.oh
+The code they mention can be seen at https://vms14.github.io/bible.txt
 
 And the application running the code at https://vms14.github.io
