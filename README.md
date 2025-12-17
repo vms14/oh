@@ -55,4 +55,4 @@ node oh.js
  [![Video oh](https://img.youtube.com/vi/ErPK1BeA27c/0.jpg)](https://youtu.be/ErPK1BeA27c)
 
 ### Audio:
- [![Video oh](https://img.youtube.com/Nck57tPN3Q8/0.jpg)](https://youtu.be/Nck57tPN3Q8)
+ [![Video podcast](https://img.youtube.com/Nck57tPN3Q8/0.jpg)](https://youtu.be/Nck57tPN3Q8)
