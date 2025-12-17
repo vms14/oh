@@ -1,6 +1,6 @@
 ### oh
 
-oh is a stack based language using postfix notation
+ a stack based language using postfix notation
 
 ```oh
 1 2 +
