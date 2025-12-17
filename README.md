@@ -1,10 +1,10 @@
-# oh
+### oh
+
+oh is a stack based language using postfix notation implemented in javascript that runs in the browser and in node.
 
 ```oh
 1 2 +
 ```
-
-oh is a stack based language using postfix notation implemented in javascript that runs in the browser and in node.
 
 * It has a fake compilation procedure that turns everything into a function. Some words are immediate and execute at compile time.
 
