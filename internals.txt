@@ -209,8 +209,8 @@ Nested Lists	(div (p "text"))	A nested list is compiled recursively and appended
 @event	(button @click ...)	Attaches an event listener. The directive (@click) is the event type. If the handler is a list of words, a new, nested lexical scope is created for its execution, into which the event word is defined.
 :variableName	(div :my-div ...)	Binds the created DOM element to a new word my-div in the current environment.
 text	(p text "Hello")	Sets the textContent of the element to the next item in the list.
-reader	(input reader value: value)	Creates a new word (value:) that, when called, pushes the current value of a specified element property (value, after case translation) onto the stack.
-writer	(p writer p: text-content)	Creates a new word (p:) that, when called, pops a value from the stack and sets a specified element property (textContent, after case translation) to it.
+reader	(input reader value value)	Creates a new word (value) that, when called, pushes the current value of a specified element property (value, after case translation) onto the stack.
+writer	(p writer p text-content)	Creates a new word (p) that, when called, pops a value from the stack and sets a specified element property (textContent, after case translation) to it.
 
 4.3 Script Loading from <oh> Tags
 
@@ -263,7 +263,7 @@ The initialization sequence, found at the end of the script, orchestrates the ap
 
 The application's entire user interface and styling are defined declaratively using nested lists.
 
-* DOM Structure: The (main ...) block defines the HTML structure. It uses the dom word and its directives to create h1 and p elements. The (p writer p: text-content) directive is what creates the p: word. This word is then immediately used by the initialization code ("Loading the bible..." p:) to display a status message, demonstrating a powerful pattern of defining a UI element and its API in a single, declarative step.
+* DOM Structure: The (main ...) block defines the HTML structure. It uses the dom word and its directives to create h1 and p elements. The (p writer p text-content) directive is what creates the p word. This word is then immediately used by the initialization code ("Loading the bible..." p:) to display a status message, demonstrating a powerful pattern of defining a UI element and its API in a single, declarative step.
 * CSS Styling: The ((font-face ...) (body ...) ...) block defines the application's visual appearance. This large, nested list is passed to the style word. Internally, style uses the css function to serialize this data structure into a complete CSS stylesheet, which is then injected into the document, applying all the specified rules from fonts and layout to colors and element positioning.
 
 5.3 Core Logic and State Management

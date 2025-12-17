@@ -1,0 +1,329 @@
+I'm going to lay down everything i know and think about this interpreter.
+
+I will focus on explaining everything as much as possible from all different aspects of the language.
+
+What i think, what i know, why exists, how it works, etc.
+
+But there will be no particular order and all thoughts will be scattered, so it is a raw brain dump.
+
+
+### What this language is?
+
+It is a rpn stack based language written in javascript.
+
+It tries to rely as much as possible on javascript, to provide as much as interoperation with it as possible.
+
+The main goal is to inherit access to all the browser APIs and do everything js can do but in a weirder way.
+
+It is also my playground to experiment with programming.
+
+In a way it is a reflection of my current understanding about programming. Everything i know about programming is being reflected either as part of the core interpreter or as a word definition.
+
+It grows when my understanding grows.
+
+But it also amplifies my understanding.
+
+It is a playground for my mind and a training process to teach me about almost any concept about programming.
+
+While showing this interpreter to chatgpt and discussing about it, it told me that it's not really reflecting my understanding, but how i deal with uncertainty and that also mirrors my own learning procedure.
+
+That in a way, it mirrors how i think.
+
+For me this interpreter is just a playground for ideas.
+
+An idea can be tested immediately by just creating a word definition, either in the language itself or in javascript.
+
+New syntax can be added by just creating a function that reads the source code and returns another function that will perform the logic, or performs the logic right away.
+
+The language does not care about almost anything.
+
+It only cares about reading a token and turning it into a function.
+
+Some tokens provoke arbitrary execution of code while the rest are delayed and stored as functions.
+
+The interpreter just reads tokens and collects functions, which will be iterated and called in sequence later.
+
+If for example it reads a number like "1", it will create a closure in javascript that stores that number and when executed will push it on the stack.
+
+1 becomes in a way:
+
+```js
+let value = 1; return () => stack.push(value)
+```
+
+So the interpreter just reads a number and captures it, returning a function, that will get executed later.
+
+I call the process of generating functions the compile procedure or compile time, and I see the execution of those functions as the runtime of the interpreter.
+
+It is not compiling anything, but delaying executions and precomputing decisions.
+
+The goal of the compiling procedure is to avoid as much as possible runtime overhead, mainly runtime lookups.
+
+It is not the same to lookup what a word means once, than 200 times in a loop.
+
+Although performance is not the real reason the compiling procedure actually exists.
+
+The main reason is to freeze definitions so when a definition relies on another definition and gets "compiled", if the other definition gets redefined, this defintion that used the other one will not be affected by the other definition being updated.
+
+In other words, it avoids dynamic binding.
+
+All the words are found in an environment in the form of a function. An environment is just:
+
+```js
+{ parent: pointer_to_another_environment_or_undef, word: {} }
+```
+
+The compiling procedure just searches for the chain of environments and looks whether the token is found in the word: {} object that serves as a lookup table for words. All words are stored in that word: {} object, the interpreter just finds and returns them.
+
+When we are creating a definition, we are just reading tokens, turning them into functions, then storing those functions in an array.
+
+The colon word is the main interface for the language to create a new definition.
+
+It reads the name of the word that is going to be generated in the current environment and starts gathering functions and storing them into an array.
+
+For example the definition of a word that pushes three numbers on the stack when executed:
+
+```oh
+: push-three-numbers 1 2 3 ;
+```
+
+The colon word ":" is an immediate word.
+
+An immediate word executes at compile time.
+
+The main procedure to turn a token into a function is a javascript function named compile element
+
+compile element takes one argument and tries to return a function. It tries to unify everything into a function.
+
+A token in the language will always represent an action.
+
+This action gets represented internally by a function.
+
+A number becomes a function that will push the number on the stack.
+
+A word defined in the environment is just a javascript function.
+
+A primitive word is a word defined in javascript directly like:
+
+```js
+env.word.name = () => console.log("hi i am the word named 'name'")
+```
+
+env is the current environment pointer. It is where compile element starts searching for words.
+
+When compile element is given the argument: "name" like in: compile_element("name") in js
+
+It will start looking from the environment pointer:
+
+```js
+ if (env.word.name)
+ {
+   return env.word.name
+ }
+```
+
+In this case if we defined that env.word.name, it will be a javascript function, compile element will just return that function.
+
+compile element is the whole interpreter.
+
+It only cares turning everything into a function or excuting immediate words.
+
+There are two types of immediate words.
+
+What i call immediate 0 and immediate 1
+
+The 0 or 1 is just a flag compile element uses to distinguish between those two types.
+
+immediate 0 means "execute this right now"
+
+immediate 1 means "execute this right now, it will return a function on the stack which you will pop from the stack and return to the caller"
+
+If a word is immediate it will execute it, if it's immediate 0, compile element will return undefined, if it's immediate 1, that word when executed will push a function on the stack and compile element will return it
+
+If the token does not map to a word, compile element will fallback to compile atom, compile atom tries to provide syntax sugar for literals and fancy stuff.
+
+A token is what read word returns, read word just reads the source code until a space, newline or tab, and returns the token it has read.
+
+Some characters are special for read word, they do not require spaces between them and constitute an entire token by themselves.
+
+The special characters are ( ) [ ] { } ` and "
+
+This is because those characters are used for special syntax provided in the form of immediate words.
+
+The starting delimiters like "(" "[" and "{", are immediate words that execute at compile time and start reading from the source code, to implement a different syntax. The closing delimiters ")" "]" and "}" are just a sentinel character for those reader words. Those immediate words will read until they find in the source code the closing delimiter.
+
+"(" "[" and "{" just call the read word function to retrieve a word and do something with it. The read word function knows both the starting and closing delimiters are special characters, so when it finds one of them it will return it without expecting spaces betwen them.
+
+That means that for the interpreter, reading
+
+```oh
+"(1 2 3)"
+```
+
+is equivalent to reading
+
+```oh
+ ( 1 2 3 )
+```
+
+The simplest example is "(" which is an immediate 1 word. Being an immediate word means compile element will execute it when it receives the "(" token as its argument, and being immediate 1 means this word has to push a function on the stack, which compile element will take and return to the caller.
+
+The read eval print loop in node will just read a line of source code and make this to become the source of the interpreter,
+
+Then it will call read word and give whatever read word returns as the argument to compile element.
+
+Compile element will either return undef or a function. The repl will store that function into an array.
+
+After all the source code has been exhausted, the repl will iterate through this array and call all the functions compile element returned.
+
+If we were to type something in the repl like:
+
+```oh
+1 2 3
+```
+
+The repl will set the source to be the string "1 2 3", then create an empty array, then start calling read word until read word returns undefined, meaning the source is exhausted, giving whatever read word returns to compile element and if compile element returns a function, it will get appended to that array, After read word signals end of source code by returning undefined, the repl will take this array and iterate it, calling all the functions.
+
+In this case what it would do is to call compile element three times
+
+```js
+compile_element("1")
+compile_element("2")
+compile_element("3")
+```
+
+Compile element will search in the environments starting from the current environment, fail because there is no word defined 1, 2 or 3 in any environment, then fallback to compile atom.
+
+Compile atom only applies several regular expression checks on that atom to determine what it is.
+
+In the case of 1 2 and 3, they match the number_regex regular expression which is:
+
+```js
+const number_regex = /^-?\d+(\.?\d*)$/
+```
+
+And it will return a function that will push that number on the stack:
+
+```js
+if (atom.match(number_regex))
+{
+  const number = parseFloat(atom)
+  return () => put(number)
+}
+```
+
+So compile element will return those closures for those numbers and the repl will store them into an array
+
+Similar in a way to this, but the numbers are lexical js variables instead of the literal numbers:
+
+```js
+[() => put(1), () => put(2), () => put(3)]
+```
+
+That's what the repl will generate from reading the line of input "1 2 3"
+
+Then it will just iterate this array and call all those functions in order.
+
+That moment is what i call runtime, the execution of the collected functions.
+
+Compile time is just when we are generating them, when we call compile_element(read_word()) and gather the results into an array.
+
+If we are gathering functions into an array, and we give compile_element the name of an immediate 0 word, compile_element will return nothing, it will just evaluate that word right away, and we won't get anything to push on our array.
+
+If we instead give it the name of an immediate 1 word, compile element will execute that word, the word will generate a function and return it on the stack, compile element will return us that function and we will append it to our array
+
+This is all the interpreter does, the rest is just to create words, either normal words, immediate 0 or immediate 1 words and maybe extend compile atom with more regular expressions.
+
+The interpreter does not know what syntax is, syntax is just tokens separated by spaces, newlines or tabs, and some characters that are a token by themselves.
+
+It does not know what an if statement is, what a loop is, etc. It just knows there are environments which store words, those words are either returned or executed and some words might return a compilation unit in form of a function when executed. Plus the compile atom function which is just a bunch of regular expressions.
+
+If compile atom runs all the chain of checks on this atom and does not recognize it, it will trigger an error.
+
+New syntax not integrated in compile atom as a regular expression is implemented by immediate words that execute at compile time, read the source code either by characters or by calling read_word and perform logic at compile time, add entries into the compilation time environments, and/or return a function on the stack that will get inserted to the compilation array.
+
+The "(" is the simplest example of an immediate 1 word that implements new syntax and returns a function on the stack that will get appended to our compilation array.
+
+The "(" internally calls a js function named build_list, that creates an array and calls read word until read word returns the ")" token.
+
+```oh
+(1 2 3)
+```
+
+If we were to type this in the node repl, the repl will call read word and read word will return "("
+
+Note that "(" does not require spaces and read_word returns "(" alone instead of "(1" because "( ) [ ] { }" are special characters that read word returns when it finds them without expecting any space.
+
+So for the interpreter this will always be seen as if we type: " ( 1 2 3 ) "
+
+Then the repl calls compile_element("(") and compile element finds this word in the root environment and sees that is an immediate 1 word, so it executes it and expects it to return a function on the stack, which will return to the repl and the repl will store in the array of functions is generating.
+
+the "(" word will execute and will start calling read word until read word returns ")", it will just store all those results into an array.
+
+This is an aproximation of what it does when compile element calls it:
+
+```js
+const list = []
+let word
+while ((word = read_word()) !== ")")
+{
+  list.push(word)
+}
+stack.push(() => put([...list])
+```
+
+* The closure returns a new copy of the list instead of the original one to avoid mutation of that list, so every time you execute the closure that "(" generated, it will return a fresh copy of the list that was been built at compile time.
+
+When "(" receives the ")" token from read word, it stops reading words and generates a javascript closure that when executed will push that array on the stack, then it just pushes this closure on the stack, compile element takes this closure and returns it to the repl and the repl stores it into the array of functions it is gathering. Once the repl knows there is no more input to compile, it will run the functions in this array. In this case the array will contain:
+
+```js
+[() => put([...list])]
+
+```
+
+And it will just iterate it and call that function.
+
+That function is the closure the "(" word generated from reading words and pushed on the stack at compile time.
+
+That's how syntax, control operators, loops, etc is added into the language.
+
+The language does not know what "(" does more than that "it executes and returns something at compile time"
+
+The "(" extends compile element in a way, since compile element trusts this word to generate a compilation unit.
+
+I like how the language does not care about anything, yet it can be extended almost infinitely by immediate words.
+
+For example the interpreter does not know what "if" means, except that "if" is an immediate 1 word.
+
+the "if" word will read the source code and generate a closure that when executed, will perform the logic of the "if" statement.
+
+Everything in this language is mainly delayed execution and partial evaluation.
+
+I tried my best into unifying everything into a function. Including variables.
+
+Variables do not exist in this language, the word bind creates something that acts as a dynamic variable, but it's just a closure that pushes a value on the stack and this value can be mutated.
+
+The reason i say i tried to unify even variables into a function is because bind generates a function that behaves as a variable.
+
+The function is just this:
+
+```js
+const binding = () => put(binding.value)
+```
+
+It relies on the fact that javascript functions are objects to just store the value property on the function object itself, making that closure become a cell or storage unit that when executed will push that value on the stack.
+
+In order to mutate a value we just need a reference to that function and do something like:
+
+```js
+binding.value = 3
+```
+
+And now when executed this function will push the number 3 on the stack.
+
+
+
+
+
+
+
