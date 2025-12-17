@@ -1,19 +1,10 @@
 ### oh
 
-oh is a stack based language using postfix notation implemented in javascript that runs in the browser and in node.
+oh is a stack based language using postfix notation
 
 ```oh
 1 2 +
 ```
-
-* It has a fake compilation procedure that turns everything into a function. Some words are immediate and execute at compile time.
-
-* It tries to rely as much as possible on the host language (javascript) and to provide seamless interoperation with it.
-
-* The data types are the data types of javascript. The stack is a javascript array and words can push or pop any number and type of elements from it.
-
-* It is a tiny core that gets extended through the definition of words in the compile time environments.
-
 
 It's a javascript file that you can download from this repository
 
@@ -56,6 +47,6 @@ node oh.js
 
 ## Documentation:
 
-[Tutorial](https://github.com/vms14/oh/blob/main/TUTORIAL.md)
-[Internals](https://github.com/vms14/oh/blob/main/INTERNALS.md)
+* [Tutorial](https://github.com/vms14/oh/blob/main/TUTORIAL.md)
+* [Internals](https://github.com/vms14/oh/blob/main/INTERNALS.md)
 
