@@ -91,7 +91,7 @@ Strings are used to represent text. The language provides two distinct ways to c
 
 Lists are ordered collections of other values. They can contain numbers, strings, and even other lists, allowing you to create nested data structures. A list is created by enclosing its elements in parentheses ( ... ). The interpreter's build_list function is responsible for parsing these structures.
 
-Example: The code ( 1 "two" ( 3 4 ) 'five ) will push a single list onto the stack. Note that the entire list is a single item on the stack. The resulting stack will be: [ [1, "two", [3, 4], "five"] ]
+Example: The code (1 two (3 4) five) will push a single list onto the stack. Note that the entire list is a single item on the stack. The resulting stack will be: [ [1, "two", [3, 4], "five"] ]
 
 3.4 Code Blocks (Quotations)
 
@@ -168,8 +168,8 @@ The case structure works by reading pairs of a match value and the code to execu
 The Bible Verse Viewer application uses this structure perfectly to handle keyboard input:
 
 event.key case
-  (` ` r)                   random-verse
-  (w a ArrowUp ArrowLeft)   previous-verse
+  (` ` r)                     random-verse
+  (w a ArrowUp ArrowLeft)     previous-verse
   (s d ArrowDown ArrowRight)  next-verse
 end
 
@@ -198,10 +198,10 @@ A common pattern looks like this, adhering to the language's postfix syntax:
 
 declare my-counter       --- Creates a variable named my-counter.
 
-5 my-counter set         --- Pushes 5 to the stack. The 'set' word consumes
+5 set my-counter         --- Pushes 5 to the stack. The 'set' word consumes
                            the value 5 and updates the 'my-counter' binding.
 
-my-counter get log       --- 'get' pushes the current value of 'my-counter' (5)
+my-counter log           --- The word itself pushes the current value 
                            to the stack. 'log' consumes this value and
                            prints it to the console.
 

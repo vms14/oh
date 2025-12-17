@@ -147,9 +147,9 @@ interval	Takes a time (in ms) and a code block. Executes the code block repeated
 A simple module system allows for code organization and namespacing.
 
 Word	Description
-module	Creates a new, isolated environment (scope) and executes the subsequent code block within it. The environment is then bound to a word with the module's name.
-import	Takes a module environment and a name (or list of names) from the stack. It copies the specified word(s) from the module's environment into the current environment.
-import-all	Takes a module environment from the stack and copies all of its words into the current environment.
+module	"module module-name code end" Creates a new, isolated environment (scope) and executes the subsequent code block within it. The environment is then bound to an immediate word with the module's name.
+import	Takes a module environment from the stack at compile time and a name (or list of names) from the source code. It copies the specified word(s) from the module's environment into the current compilation environment.
+import-all Takes a module environment from the stack and copies all of its words into the current compilation environment.
 
 3.5 Data Structure and String Operations
 
