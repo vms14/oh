@@ -26,6 +26,7 @@ The stack is a single mutable array.
 
 ```js
 const stack = []
+```
 
 There is exactly one stack. It exists at runtime. It is not passed around. It is mutated directly.
 
@@ -47,8 +48,10 @@ Stack Primitives
 
 Typical primitives look like:
 
+```js
 const put = x => stack.push(x)
 const get = () => stack.pop()
+```
 
 These functions are not language words. They are host-level helpers used by compiled closures.
 
@@ -83,10 +86,12 @@ Structure
 
 An environment is a linked structure:
 
+```js
 {
-  table: Map<string, Word>,
+  word: {}
   parent: Env | null
 }
+```
 
 Lookup proceeds upward until:
 
@@ -109,9 +114,11 @@ compiler extension
 
 Environment Creation
 
+```js
 function makeEnv(parent = null) {
-  return { table: new Map(), parent }
+  return { word: {}, parent }
 }
+```
 
 There is:
 
@@ -121,35 +128,6 @@ child environments created as needed
 
 
 Compile-time and run-time may use different environments, but structurally they are identical.
-
-
----
-
-Word Representation
-
-A word is not syntax. A word is an object.
-
-Typical structure:
-
-{
-  name: "dup",
-  immediate: false,
-  fn: () => {
-    const x = get()
-    put(x)
-    put(x)
-  }
-}
-
-Important properties:
-
-fn is the executable meaning
-
-immediate determines when it runs
-
-words do not know whether they are being compiled or executed
-
-the compiler decides that
 
 
 
