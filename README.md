@@ -34,7 +34,7 @@ node oh.js
 </body>
 </html>
 ```
-* If the tags have a src attribute it will fetch then and evaluate it
+* If the tags have a src attribute it will fetch the file and evaluate it
 
 ```html
 <oh src="oh.oh"></oh>
