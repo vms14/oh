@@ -25,12 +25,12 @@ node oh.js
 ```html
 <!DOCTYPE html>
 <html>
-<head>
- <script src="oh.js"></script>
-</head>
-<body>
- <oh> (p "oh...") dom to-body </oh>
-</body>
+ <head>
+  <script src="oh.js"></script>
+ </head>
+ <body>
+  <oh> (p "oh...") dom to-body </oh>
+ </body>
 </html>
 ```
 * If the tags have a src attribute it will fetch the file and evaluate it
