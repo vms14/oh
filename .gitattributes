@@ -1,2 +1,0 @@
-podcast.m4a filter=lfs diff=lfs merge=lfs -text
-podcast.wav filter=lfs diff=lfs merge=lfs -text
