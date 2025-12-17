@@ -1,0 +1,283 @@
+Technical Specification: A Stack-Based Scripting Language Interpreter
+
+Introduction: System Overview
+
+This document deconstructs the internal architecture and capabilities of a stack-based, concatenative scripting language. The system is engineered on a set of core design principles: a simple, extensible core; a dynamic compilation model; and a rich, integrated API for browser-based DOM manipulation.
+
+The objective of this specification is to provide a comprehensive and deeply technical explanation of the interpreter's components. It will cover the entire system, from the fundamental execution pipeline and data structures to the standard library vocabulary and its practical application in building dynamic web interfaces.
+
+
+--------------------------------------------------------------------------------
+
+
+1.0 Core Architecture and Execution Model
+
+An understanding of the core architecture is fundamental to comprehending the language's execution flow and expressive power. This section details the two central components that govern all operations within the interpreter: the global data stack, which serves as the primary workspace for all computations, and the scoped environment model, which manages the lifecycle and visibility of words and variables.
+
+1.1 The Global Stack
+
+The central data structure for all operations is the global stack. It is a Last-In, First-Out (LIFO) structure where words (the language's equivalent of functions or operators) consume values from the top of the stack and push their results back onto it. The standard library provides a comprehensive set of words for direct stack manipulation.
+
+Function	Description
+put(...stuff)	Pushes one or more items onto the top of the stack.
+get()	Pops and returns the single topmost item from the stack. Raises a "stack underflow" error if the stack is empty.
+getn(num)	Pops and returns a new array containing the specified number (num) of items from the top of the stack.
+get2(), get3(), get4()	Specialized, high-performance versions of getn that retrieve exactly 2, 3, or 4 items from the stack.
+dup	Duplicates the topmost item on the stack.
+swap	Swaps the position of the top two items on the stack.
+drop, 2drop, 3drop, 4drop	Removes 1, 2, 3, or 4 items from the top of the stack, respectively.
+
+1.2 The Scoped Environment Model
+
+The interpreter implements lexical scoping through the env variable, which points to the current environment. An environment is a simple object containing two key properties: a word dictionary that maps names to their executable functions, and a parent link that points to its enclosing (outer) scope. This structure forms a prototypical chain.
+
+When a word needs to be resolved, the find(name) function is invoked. It performs a lookup sequence:
+
+1. It first checks the word dictionary of the current env.
+2. If the name is not found, it traverses up the chain of parent links, checking the word dictionary of each ancestor environment in sequence until it finds the name or reaches the root environment (where parent is null).
+
+A second lookup function, search(name), exists for more advanced metaprogramming; it traverses the same chain but returns the entire environment object in which the word was found, rather than just the word's function. New, nested scopes are created using the make_env(parent) function, which generates a new environment object linked to the provided parent scope. This environment model is the fundamental mechanism that enables the creation of functions, code blocks, and modules, each with its own private scope.
+
+
+--------------------------------------------------------------------------------
+
+
+2.0 The Compilation and Interpretation Pipeline
+
+A key architectural feature of the language is its dynamic compilation model, where source text is transformed into a series of executable JavaScript functions before interpretation. This model prioritizes runtime flexibility and metaprogramming over static analysis and compile-time optimization, enabling powerful capabilities as the compilation process itself can be manipulated by the language's own constructs.
+
+2.1 Tokenization: The read_word Function
+
+The pipeline begins with tokenization, handled by the read_word() function. This function is responsible for consuming the global source string and splitting it into a sequence of "words" (tokens).
+
+* It parses the source text, treating any contiguous sequence of non-whitespace characters as a single word.
+* It gives special treatment to a predefined set of characters ({, [, (, ", etc.), which are defined in the special object. When one of these characters is encountered, it is immediately returned as a single-character word. This allows these characters to function as syntactic markers that trigger specific compilation behaviors.
+
+2.2 The Compilation Core: compile_element
+
+The compile_element(element) function serves as the central dispatcher for the compilation process. It receives a single token (an element) from the tokenizer and determines how to convert it into an executable JavaScript function that can be added to the final execution unit.
+
+Its logic proceeds as follows:
+
+* String: If the element is a string, it first attempts to resolve it as a known word using find(element).
+  * If a word is found and it has the immediate property set, the word is executed immediately at compile time.
+  * If a word is found without the immediate flag, its corresponding function is returned directly.
+  * If the string is not a known word, it is treated as a syntactic "atom" and is passed to the compile_atom function for further parsing.
+* Array: An array is treated as a data literal. compile_list is called, which generates a function that, when executed, pushes a copy of that array onto the stack. This is a critical design choice: unlike many Lisp-like languages, nested arrays are treated as data structures by default, not as code to be executed. If an element within the array is another array, a function is generated to push that nested array as a literal, rather than compiling it.
+* Function: If the element is already a JavaScript function, it is returned directly, ready to be included in the compiled output.
+* Other Primitives (Number, null, etc.): Any other primitive data type (e.g., a number, boolean, or null) is wrapped in a simple function that, when executed, pushes that literal value onto the global stack.
+
+2.3 Atom Compilation: Syntax and Semantics
+
+An "atom" is a string token that does not correspond to a pre-defined word in the current environment. The compile_atom(atom) function is responsible for parsing these atoms, matching them against a set of syntactic patterns to generate specific runtime behaviors. A key feature of this process is that for all property access patterns, property names are automatically translated from kebab-case (e.g., text-content) to camelCase (textContent) via the translate_case helper, allowing for idiomatic naming in both the scripting language and the host JavaScript environment.
+
+The following table details the primary syntax rules applied by compile_atom.
+
+Syntax Pattern	Example	Compiled Behavior
+Number	42, -3.14	Generates a function that pushes the parsed floating-point number onto the stack.
+Quoted Literal	'hello	Generates a function that pushes the string hello (without the leading quote) onto the stack.
+Delayed Binding	:my-var	Creates a word named my-var in the current environment. This new word is bound to whatever value is on top of the stack at the time :my-var is executed.
+Delayed Binding & Push	:my-var:	Same as Delayed Binding, but also pushes the bound value back onto the stack immediately after binding.
+Delayed Lookup	my-var:	Compiles a function that, when executed, looks up my-var in the environment and executes it. This defers the lookup from compile time to runtime.
+Stack Property Access	.name	Gets the value of the name property (after case translation) from the object on top of the stack and pushes the result.
+Stack Property Assignment	.name!	Pops a value and an object from the stack, sets the object's name property (after case translation) to the value.
+Object Property Access	obj.name	Looks up the word obj, executes it to get an object, then pushes the value of its name property (after case translation) onto the stack.
+Object Property Assignment	obj.name!	Looks up and executes obj, pops a value from the stack, and assigns it to the name property (after case translation) of the obj object.
+Method Call (No Args)	-method	Pops an object, calls its method() with no arguments, and pushes the return value.
+Method Call (Void)	~method	Pops an object and calls its method() with no arguments. The return value is discarded.
+Method Call (With Args)	--method	Pops an arguments array and an object, calls object.method(...args), and pushes the return value.
+Method Call (Void, Args)	~~method	Pops an arguments array and an object, calls object.method(...args). The return value is discarded.
+
+2.4 The Execution Unit
+
+After the source text is fully tokenized and compiled into a list of JavaScript functions, these functions are assembled into a single, cohesive execution unit.
+
+* make_fun(list): This function takes a list of compiled functions and returns a single, zero-argument function. When this new function is called, it iterates through the list and executes each compiled function in sequence. This is the default synchronous execution model.
+* make_async_sub(list): This function provides an asynchronous execution model. It also returns a single function that iterates through the compiled list. However, after executing each step, it checks if the item on top of the stack is a Promise. If it is, the interpreter pops the promise and awaits its resolution. The await is wrapped in a try/catch block that invokes the global catch_code error handler on failure. If the promise resolves successfully, its result is pushed back onto the stack, but only if the result is not undefined. The wait and no-wait words control which of these two "make" functions is used to assemble the final code block.
+
+2.5 Immediate Words
+
+The concept of "immediate" words is central to the language's extensibility. A word whose immediate property is set to true is executed during the compilation phase, rather than being added to the list of functions for later execution.
+
+The purpose of this mechanism is to implement control structures, macros, and other constructs that need to manipulate the compilation process itself. For example, words like if or { are immediate because they need to read ahead in the source stream and conditionally compile different code paths. The immediate() helper function is used to toggle this flag on words. This feature allows the language's syntax to be extended from within the language itself, providing a key source of the language's extensibility and power.
+
+
+--------------------------------------------------------------------------------
+
+
+3.0 Standard Library: Core Vocabulary
+
+The language's utility and power are derived from its rich set of built-in words—its core "vocabulary." This standard library provides fundamental operations for everything from basic stack manipulation and arithmetic to advanced control flow, asynchronicity, and module creation.
+
+3.1 Function and Variable Definition
+
+These words provide the mechanisms for creating new words and binding names to values.
+
+Word	Description
+: / ;	Begins and ends the definition of a new word. The word's name is read from the source, and the subsequent code until ; is compiled into its body.
+defun	Defines a function in the current scope that, when called, creates a new, nested scope for its execution. This ensures the function does not affect its parent's scope.
+declare	Creates a new variable in the current scope, initialized to 0. The variable's word is a function that pushes its current value onto the stack.
+bind	Creates a variable that pushes its value to the stack. It also pushes a function that, when called, will pop a value from the stack and assign it to the variable.
+block	Compiles a block of code until end. When the resulting function is executed, it runs within a new, nested scope created at execution time.
+lambda	Compiles a code block enclosed by end and pushes a function factory onto the stack. When this factory is executed, it creates a new function (a closure) with a dedicated lexical scope and pushes that function onto the stack. This is the primary mechanism for creating first-class functions.
+
+3.2 Control Flow and Conditionals
+
+The language provides structured control flow words that are implemented as immediate words that manipulate the compilation process.
+
+Word	Description
+if...then...else...end	The if word compiles the code up to then as the conditional part. It then compiles the code between then and else as the true branch, and the code between else and end as the false branch. At runtime, the conditional is executed, and depending on the result, the appropriate branch is taken.
+case...end	Implements a multi-way branching structure. It compiles a series of key-value pairs where the key is a literal value and the value is a code block. At runtime, it pops a value from the stack and executes the code block associated with the matching key. An else clause can provide a default case.
+iterate	Takes a list and a code block from the stack. It then executes the code block for each element in the list, pushing the current element onto the stack before each execution.
+
+3.3 Metaprogramming and Asynchronicity
+
+These words expose the interpreter's internal mechanisms and provide tools for handling asynchronous operations.
+
+Word	Description
+eval	Pops a value from the stack, compiles it, and executes it immediately.
+compile	Pops a value from the stack, compiles it, and pushes the resulting executable function back onto the stack.
+promise	Creates and pushes a new Promise. It also defines resolve and reject words within a temporary scope, allowing the provided code block to control the promise's state.
+fetch	Takes a URL from the stack and initiates a fetch request, pushing the resulting Promise onto the stack.
+timeout	Takes a time (in ms) and a code block. Executes the code block after the specified delay.
+interval	Takes a time (in ms) and a code block. Executes the code block repeatedly at the specified interval.
+
+3.4 Modules and Environment Management
+
+A simple module system allows for code organization and namespacing.
+
+Word	Description
+module	Creates a new, isolated environment (scope) and executes the subsequent code block within it. The environment is then bound to a word with the module's name.
+import	Takes a module environment and a name (or list of names) from the stack. It copies the specified word(s) from the module's environment into the current environment.
+import-all	Takes a module environment from the stack and copies all of its words into the current environment.
+
+3.5 Data Structure and String Operations
+
+The standard library includes words for creating and manipulating common data structures.
+
+* Object Creation: object creates an object from an interleaved list of keys and values. obj creates an object from a list of keys and a corresponding number of values from the stack.
+* Object Introspection: keys, values, and entries behave like their JavaScript counterparts, pushing the respective array onto the stack.
+* List Creation: list pops a number n and creates a list from the next n items on the stack.
+* String Creation: " and ` are immediate words that read from the source stream until a matching delimiter is found. They produce a compiled function, not a raw string value. This function, when executed as part of a larger code body, pushes the string literal onto the stack.
+* List Interpolation: @ triggers interpolate_list, which processes a list, replacing any , elements with values popped from the stack.
+* CSS Generation: css takes a nested list structure and serializes it into a valid CSS string.
+
+3.6 The mutator Factory
+
+The mutator(caller_name, code) function is a powerful factory for creating immediate words that generate code for modifying variables or properties. It is used to define words like set, increment, and get. When one of these mutator words is used, it reads the next token from the source and, based on its syntax, generates the appropriate mutation code.
+
+It supports four distinct targeting syntaxes:
+
+1. Stack-based (.prop): Generates code to modify a property on an object that will be on the stack at runtime.
+2. Object-based (obj.prop): Generates code to execute obj, get the resulting object, and modify its property.
+3. Runtime Lookup (name:): Generates code that looks up the variable name at runtime and performs the mutation.
+4. Compile-time Lookup (name): Looks up the variable name at compile time and generates code to mutate it directly.
+
+This factory is a cornerstone of the language's design. It embodies a metaprogramming pattern that avoids code duplication for an entire class of common operations (e.g., setters, getters, incrementers), thereby keeping the core vocabulary lean, consistent, and extensible. This core vocabulary forms a platform-agnostic foundation. The subsequent section details the specialized API that adapts this core for the browser runtime environment, transforming it into a powerful tool for web application development.
+
+
+--------------------------------------------------------------------------------
+
+
+4.0 The Browser Runtime Environment and DOM API
+
+While the core interpreter is platform-agnostic, its primary power is unlocked within the browser environment. Here, it provides a high-level, declarative API for DOM manipulation, styling, and event handling, abstracting away much of the verbosity of standard web APIs.
+
+4.1 Environment Initialization
+
+When the interpreter initializes in a browser context, the browser() function is called. This function bootstraps the entire browser environment and performs several key actions:
+
+* It populates the root environment with essential words that provide access to core browser objects, such as body, window, and document.
+* It defines words for creating DOM elements (element).
+* It creates a global <style> element in the document's <head>, which will be used to inject user-defined CSS rules generated by the style word.
+* It sets up the script loader, which will execute code found within <oh> tags in the host HTML page.
+
+4.2 Declarative DOM Creation: The dom Word
+
+The dom word is a powerful and expressive feature for declarative UI construction. It takes a single nested list from the stack and translates it into a corresponding DOM tree. The structure of the list maps directly to the structure of the HTML, and special string directives are used to set attributes, classes, event handlers, and more.
+
+dom Word Directives
+
+The following table outlines the directives that can be used within a dom list.
+
+Directive Syntax	Example	Description of Action
+Element Name	(p ...)	The first item in a list is the element's tag name (e.g., p).
+Nested Lists	(div (p "text"))	A nested list is compiled recursively and appended as a child element.
+.className	(div .container ...)	Adds the class container to the element's classList.
+#id	(div #main ...)	Sets the id attribute of the element to main.
+-attribute	(input -type "text")	Sets an attribute. The directive (-type) is the attribute name, and the next item in the list ("text") is its value.
+@event	(button @click ...)	Attaches an event listener. The directive (@click) is the event type. If the handler is a list of words, a new, nested lexical scope is created for its execution, into which the event word is defined.
+:variableName	(div :my-div ...)	Binds the created DOM element to a new word my-div in the current environment.
+text	(p text "Hello")	Sets the textContent of the element to the next item in the list.
+reader	(input reader value: value)	Creates a new word (value:) that, when called, pushes the current value of a specified element property (value, after case translation) onto the stack.
+writer	(p writer p: text-content)	Creates a new word (p:) that, when called, pops a value from the stack and sets a specified element property (textContent, after case translation) to it.
+
+4.3 Script Loading from <oh> Tags
+
+The interpreter can execute scripts directly from the host HTML page. The load_scripts() function, which runs automatically on window load, queries the document for all <oh> tags. It processes each tag in two ways:
+
+1. src Attribute: If a src attribute is present, it fetches the content from the specified URL.
+2. Inline Content: It retrieves any text content from within the tag itself.
+
+In both cases, the retrieved source code is trimmed and executed by the interpret_string function. After processing, each <oh> tag is removed from the live DOM to finalize the loading lifecycle.
+
+4.4 Browser API Vocabulary
+
+The browser() function pre-populates the environment with a rich vocabulary for interacting with the browser API.
+
+Core Browser Words
+
+Word	Description
+element	Pops a tag name (string) and pushes a new, corresponding DOM element.
+to-body	Pops a DOM element or an array of elements and appends it to the document.body.
+append	Pops a child (element or array of elements) and a parent element, and appends the child to the parent.
+style / style-append	Pops a CSS string (or a list to be converted by css) and sets or appends it to the document's user-defined stylesheet.
+make-canvas, clear, rectangle, color	A suite of words for creating and drawing on a full-screen HTML5 Canvas.
+animation	Takes a code block and runs it within a requestAnimationFrame loop.
+handler	An immediate word for creating event handlers. It creates a temporary scope where the word event is defined, allowing access to the event object.
+image / images	Asynchronously loads one or more images, pushing a Promise that resolves with the loaded image(s).
+
+The next section provides a practical case study, demonstrating how these architectural components and API vocabularies are used in concert to build a complete application.
+
+
+--------------------------------------------------------------------------------
+
+
+5.0 Application Case Study: The Bible Verse Viewer
+
+This case study deconstructs a complete application to provide a practical demonstration of how the language's features—from DOM creation and styling to event handling and asynchronous data fetching—work in concert. The application fetches a JSON file of Bible verses and displays them to the user, who can navigate through them with button clicks or keyboard shortcuts.
+
+5.1 Application Architecture and Initialization
+
+The application's functionality is straightforward: it loads verse data, creates a simple UI to display a verse and its reference, and provides controls to navigate to the next, previous, or a random verse.
+
+The initialization sequence, found at the end of the script, orchestrates the application's startup:
+
+1. A "Loading the bible..." message is immediately displayed by pushing the string and calling the p: writer word.
+2. The wait word is called, switching the interpreter to its asynchronous execution mode to handle the upcoming network request.
+3. The 'kjv.json' file is fetched. The resulting Promise is chained with a call to the -json method to parse the response. The final parsed object is stored in the bible variable using set.
+4. An iterator is created from the keys of the bible object and stored in the verses variable. This iterator will manage the current position in the list of verses.
+5. Finally, random-verse is called to fetch and display the initial verse.
+
+5.2 DOM and Style Definition
+
+The application's entire user interface and styling are defined declaratively using nested lists.
+
+* DOM Structure: The (main ...) block defines the HTML structure. It uses the dom word and its directives to create h1 and p elements. The (p writer p: text-content) directive is what creates the p: word. This word is then immediately used by the initialization code ("Loading the bible..." p:) to display a status message, demonstrating a powerful pattern of defining a UI element and its API in a single, declarative step.
+* CSS Styling: The ((font-face ...) (body ...) ...) block defines the application's visual appearance. This large, nested list is passed to the style word. Internally, style uses the css function to serialize this data structure into a complete CSS stylesheet, which is then injected into the document, applying all the specified rules from fonts and layout to colors and element positioning.
+
+5.3 Core Logic and State Management
+
+The application's logic is encapsulated in a small set of custom words. State is managed implicitly through the bible object (which holds all data) and the verses iterator (which tracks the current position).
+
+* show-verse: This is the core display function. It takes a verse key from the stack, uses it to retrieve the full verse object from the bible data, cleans the verse text by removing specific characters, and finally updates the DOM by calling the p: and h1: writer words.
+* next-verse, previous-verse, random-verse: These words manage navigation. Each one calls the appropriate method on the verses iterator (next-element, previous-element, random-element) to get a new verse key, and then calls show-verse to update the view with the new content.
+
+5.4 User Interaction and Event Handling
+
+The application demonstrates two distinct methods for handling user input.
+
+1. Declarative Event Binding: Within the dom definition block, the @click directive is used on the <button> elements. This provides a direct, declarative link between a UI event (a click) and the execution of a specific word (next-verse:, random-verse:, etc.).
+2. Global Event Handling: A global keydown handler is attached to the body. This handler uses a case block to implement multi-way branching based on the event.key property. This block highlights the expressiveness of the case word by grouping multiple keys for a single outcome, such as ( r) for random-verse and (w a ArrowUp ArrowLeft) for previous-verse.
+
+This case study effectively demonstrates the language's capacity for building dynamic, event-driven web applications. By combining declarative UI definition, a simple state management model, and a powerful standard library, it achieves a high degree of functionality with a concise and expressive syntax.

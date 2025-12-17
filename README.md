@@ -49,7 +49,7 @@ node oh.js
 
 * [Word list](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/words.txt)
 * [Overview](https://github.com/vms14/oh/blob/main/overview.md)
-* [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.md)
+* [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.txt)
 
 ### Video:
  [![Video oh](https://img.youtube.com/vi/ErPK1BeA27c/0.jpg)](https://youtu.be/ErPK1BeA27c)
