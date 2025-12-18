@@ -462,7 +462,157 @@ That's how or why colon definitions can be nested:
 ;
 ```
 
-* Just as a note, the node repl only reads by lines so it would choke on this code being separated by newlines, so in the node repl would have to be one line: ": outer-definition : inner-definition 1 2 3 ; ;" This is a strong limitation of the node repl. Note also that if we were loading an entire file, either from node or the browser, we would be creating an array of functions and read and compile all the words in the entire file, storing all the functions in the array, then after we find the end of the file, we will iterate this array and execute all the functions, mirroring what the repl does for a line and what the colon word does for a definition.
+* Just as a note, the node repl only reads by lines so it would choke on this code being separated by newlines, in the node repl would have to be one line: ": outer-definition : inner-definition 1 2 3 ; ;" This is a strong limitation of the node repl. Note also that if we were loading an entire file, either from node or the browser, we would be creating an array of functions and read and compile all the words in the entire file, storing all the functions in the array, then after we find the end of the file, we will iterate this array and execute all the functions, mirroring what the repl does for a line and what the colon word does for a definition.
+
+When whatever was reading the source code (the repl, the procedure that loads a file, the oh tags in the browser, etc), finds the first ":" and feeds it to compile element, the ":" word executes and starts creating a definition named "outer-definition", for this definition it creates a new environment that inherits from the current environment (in this case the root environment) and starts compiling words, by calling read word and giving that word to compile element.
+
+The ":" word reads the word "outer-definition" and sets it as the name for the word:
+
+```js
+const name = read_word()
+// name = 'outer-definition'
+```
+
+Then stores a reference of whatever was the current environment
+
+```js
+const previous_environment = env
+// previous_environment = root
+```
+
+Then creates a new environment that will inherit from the current environment, and makes this environment become the current one.
+
+```js
+env = make_env(env)
+```
+
+So now env is a temporary environment that the ":" has generated and inherits from the root environment, since make_env returns:
+
+```js
+{ parent: root, word: {} }
+```
+
+This can be considered the environment of the "outer-definition" word, since it is generated to become the current environment for the compilation of that word.
+
+Then the ":" word starts reading words until it finds a terminating semicolon ";"
+
+```js
+const code = []
+while ((word = read_word()) !== ";")
+{
+   const value = compile_element(word)
+   if (value)
+   {
+     code.push(value)
+   }
+}
+```
+
+* Note that this loop will call compile element every time until a ";", but the environment in which compile element will start looking for definitions is that environment ":" has generated for that current definition, the environment of the word "outer-definition".
+
+Then it will read the next word and find another ":", which compile_element will execute since it's an immediate 0 word, and return undefined after executing it.
+
+The ":" word then will recurse since it's calling compile element and compile element is calling ":" and the same process will repeat.
+
+The ":" word will read the next word, which is "inner-definition" and say:
+
+```js
+const name = 'inner-definition'
+```
+
+then do the same thing with the environments, store a reference to the current environment and set the current environment to a new environment that inherits from the previous one:
+
+```js
+const old_environment = env
+env = make_env(env)
+// env = { parent: the_environment_of_outer_definition, word: {} }
+```
+
+Now the current environment is an environment that inherits from the environment of the "outer-definition" word, and a pointer to the environment of the "outer-definition" word is stored as the "old_environment" reference, to later restore "env" to point there again after it finds the semicolon ";".
+
+then the inner ":" will keep reading words in our example it was ": inner-definition 1 2 3 ;" so it will call compile element with those numbers and create an array like:
+
+```js
+const code = [() => put(1), () => put(2), () => put(3)]
+```
+
+Then restore the "env" pointer to point back to the previous environment:
+
+```js
+env = old_environment
+// env = the_environment_of_the_outer_definition
+```
+
+And register the word in that current environment.
+
+```js
+env.word[name] = () => { for (let fun of code) { fun() } }
+// env = outer_definition_environment
+```
+
+Then it ends execution and the outer ":" definiton resumes from there.
+
+In this case the outer definition had no code inside it.
+
+```oh
+: outer-definition
+  : inner-definition 1 2 3 ;
+;
+```
+
+The outer ":" only has read the name of the word to define, then it found a ":" inside it, so compile element executed that while the outer ":" was executed, and returned undefined to the outer ":", so the code array of "outer-definition" would be empty and it's runtime execution would be to iterate through an empty array.
+
+Also note that both the compile time environments that both ":" generated do not exist anymore, since when a ":" finds a ";" and terminates compilation, it restores the pointer of the current environment to point back to the previous one and those environments do not get referenced by anything so javascript garbage collector frees them.
+
+In this example it means that the inner definition was useless, since it was only visible during the compilation of the outer definition, but the outer definition didn't have more code except for the inner definition itself. Nothing has captured or frozen the inner definition and both environments of those words have been lost, so the function that inner definition generated has been lost.
+
+It also means that outer-definition is a "do nothing" operation, because it's execution array is empty, since in it's code there was only an immediate 0 word that didn't return anything.
+
+If the code were to be like this instead:
+
+```js
+: outer-definition
+  : inner-definition 1 2 3 ;
+  inner-definition
+;
+```
+
+Then the same procedure would apply, but after the inner definition ends execution and injects the generated definition into the environment of the outer definition, the outer definition keeps reading words and it finds the word "inner-definition" in it's code, which gives to compile element and compile element finds it, because the current environment is the environment of the outer definition and the inner definition was defined in that environment, so it gets appended to the compilation array of the outer definition.
+
+That's when the inner-definition gets frozen into the definition of the outer and even if the environments of inner definition and outer definition disappear, the outer definition gets defined in the root environment and the inner definition gets frozen as a closure in the code array of the outer definition.
+
+```js
+root.word['inner-definition'] = [() => { this is a stored reference of outer_definition_env.word['inner-definition'] }]
+```
+
+even if outer_definition_env and inner_definition_env (that env = make_env(env) both ":" generated at compile time) do not exist anymore, the function that the inner definition injected into the outer definition environment has been stored into the array of code of the outer definition word and the outer definition is itself available in the root environment.
+
+Every definition that does
+
+```js
+old_environment = env
+env = make_env(env)
+```
+
+will also restore that pointer later when it ends compilation with
+
+```js
+env = old_environment
+```
+
+That means that the first ":" stores a pointer to the root environment and the inner ":" stores a pointer to the environment the outer one generated, then later restores env to point back to that environment so when the inner ":" ends compilation, restores env to point back to the environment that the first ":" generated and when the first ":" ends compilation will restore env to point to the root environment.
+
+At the end, no matter how much we nest definitions, we will come back to the root environment after compiling everything.
+
+Unless this procedure fails to restore properly the current environment pointer which will likely become a problem.
+
+If the interpreter finds an error, it will restore env to point back to the current environment.
+
+An error throws a javascript error, the repl will keep evaluating, but reading from files or any other way will abort and stop reading.
+
+If an error is found at compile time while we are messing with the environments, it will lead to an unknown state, by default all the interpreter will just abort, but if we were to continue like in a repl, the compiling procedure will fail to restore the env pointer, so an error will always point to root again, which only affects the repl because reading a file or a tag would abort all evaluation and compiling anyways.
+
+An error in the interpreter is only triggered when something tries to retrieve on the stack more elements than the stack has and when a word is not recognized at compile time.
 
 
 
