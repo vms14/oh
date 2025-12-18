@@ -614,8 +614,113 @@ If an error is found at compile time while we are messing with the environments,
 
 An error in the interpreter is only triggered when something tries to retrieve on the stack more elements than the stack has and when a word is not recognized at compile time.
 
+Some words will trigger an error by themselves, for example when an immediate word reads from the source code expecting a word and read word returns undefined.
 
+The "(" word for example will trigger an error telling it did not find a terminating ")" if read_word returns undefined when "(" was expecting to stop reading words when read_word returns ")", since read word returning undefined means the end of source code, the "(" word understands that there is no more code to read and it never found a closing parenthesis ")".
 
+Same for any word that expects a delimiter to stop reading words and any word that expects a word name in the source code.
+
+For example the word "bind" reads a name from the source code and creates a word that associates a value from the stack with a name.
+
+```oh
+24 bind twenty-four
+```
+
+The bind word will read the word twenty-four and create a word in the current environment at compile time that will push 24 on the stack.
+
+bind is an immediate 1 word, which means that not only executes at compile time (compile element executes it instead of returning it), but also returns a function on the stack at compile time that will get appended to the execution array of whatever we were compiling (compile element just executes bind and knows bind will return a function on the stack which will return to the caller, be it the repl itself, a colon definition, etc)
+
+bind is immediate 1 because it has to operate at compile time, since it needs to read a word name and create an entry on the current compilation environment with that name so it becomes available after bind registers it and can later be used.
+
+After executing bind, the word "twenty-four" will be available for that compilation unit, be it the line of the repl, the whole file, etc.
+
+In this case we are using it inside any definition so it runs in the top level. The top level is the repl execution array, the file execution array, etc.
+
+So if we later type "twenty-four" the repl or whatever will call compile element and compile element will find twenty four in the current environment (in this case the root environment)
+
+And twenty-four should push the number 24 on the stack when executed.
+
+The problem is, the number 24 must come from the stack, since the job of the bind word is to associate names with word values, to avoid stack juggling, but the bind word executes at compile time.
+
+The binding the bind word generates is that function that acted as a cell
+
+```js
+const binding = () => put(binding.value)
+```
+
+It's a function that pushes a value that it's stored in itself, since functions in javascript are objects and binding.value is the value property of the function being generated.
+
+In order to set the binding.value property to the value of the stack it has to delay the assignment to the runtime, this is why bind is an immediate 1 word that returns a function on the stack which compile element returns to the caller, because the function it returns is the setter.
+
+The bind word does this when compile element executes it:
+
+```js
+const name = read_word()
+// name = "twenty-four"
+const binding = () => put(binding.value)
+binding.value = 0
+env.word[name] = binding
+stack.push(() => binding.value = stack.pop())
+```
+
+Then compile element receives that function from the stack:
+
+```js
+() => binding.value = stack.pop()
+```
+
+And returns it to the caller, if we were on the repl, the caller would be the repl itself and this function would be appended to the repl_execution_array, which will later execute.
+
+So the line in the repl:
+
+```oh
+24 bind twenty-four
+```
+
+will make the repl call compile_element("24") which will return that closure compile atom generates similar to: () => put(24) but 24 being actually a lexical js variable, result of parseFloat("24"), which the repl will append to its own execution array:
+
+```js
+repl_execution_array = [() => put(24)]
+```
+
+Then the repl will read the next word and give it to compile element:
+
+```js
+compile_element("bind")
+```
+
+And compile element will see it's an immediate 1 word, which has to execute and return a function on the stack:
+
+the bind word calls read word and reads "twenty-four", then define an entry in the root environment with that binding, then push the setter (the () => binding.value = stack.pop()) on the stack and compile element will return that function to the repl, which the repl will add to it's own execution array:
+
+```js
+repl_execution_array = [() => stack.push(24), () => binding.value = stack.pop()]
+// the code was: 24 bind twenty-four
+```
+
+The repl will find no more code to read so it will just iterate that array and execute each function.
+
+The first function is just the number 24 converted to a function that pushes it on the stack when evaluated, so the repl will execute it and the stack will have that number on top.
+
+The second function is the setter that bind returned on the stack, it takes an element from the stack and stores it to binding.value.
+
+If we later were to use the word twenty-four, it will push whatever binding.value holds.
+
+Let's try with a colon definition that creates a binding to use it later in a very complex operation:
+
+```oh
+: complex-operation bind number
+   number 1 +
+;
+```
+
+The word complex-operation creates a binding to associate the name "number" to a value from the stack, to use that name later to refer to that value, then it uses that binding to push that value on the stack, then it pushes 1 on the stack and calls the word "+" which will take those two numbers and sum them to return the result on the stack.
+
+* Note that complex-operation does not really need bind here, but it's the simplest example to demonstrate what bind does. complex-operation could just be defined as: ": complex-operation 1 + ;"
+
+In this case the top level (the repl or whatever, although the repl cannot really read multiple lines) will call read word which returns ":" and call compile_element(":") which will start a definition.
+
+The ":" word will do that thingy with the environments, read a word 
 
 
 
