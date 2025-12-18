@@ -720,7 +720,145 @@ The word complex-operation creates a binding to associate the name "number" to a
 
 In this case the top level (the repl or whatever, although the repl cannot really read multiple lines) will call read word which returns ":" and call compile_element(":") which will start a definition.
 
-The ":" word will do that thingy with the environments, read a word 
+The ":" word will do that thingy with the environments, read the word "complex-operation", then start storing functions into its compilation array.
+
+The first word in the definition of complex-operation is the word "bind", which being an immediate 1 word will execute at the compilation time of the complex operation, note that at this time the current environment points to the environment the ":" word has generated for the compilation of the complex operation (env = make_env(env)).
+
+The word bind executes and reads the word "number" and creates that binding function
+
+```js
+const binding = () => put(binding.value)
+```
+
+And registers it to the current environment at that compile time:
+
+```js
+const name = read_word()
+// name = "number"
+env.word[name] = binding
+```
+
+then returns on the stack the setter function:
+
+```js
+stack.push(() => binding.value = stack.pop())
+```
+
+which the compile element function will take from the stack and return to its caller, being the caller the ":" word that its gathering functions for the code array of the complex operation, so the code array of complex operation is:
+
+```js
+code = [() => binding.value = stack.pop()]
+```
+
+But also the binding has been registered in the environment of the complex operation when bind did:
+
+```js
+env.word.number = binding
+```
+
+Then the ":" word will keep reading words, remember that the definition was:
+
+```oh
+: complex-operation bind number
+   number 1 +
+;
+```
+
+So after the word bind, the word number is found and compiled, compile_element("number") returns the word that bind has just registered in the current environment and ":" appends it to the execution array of the complex operation:
+
+```js
+code = [() => binding.value = stack.pop(), () => put(binding.value)]
+```
+
+then it reads the 1 which gets converted to () => put(1) by compile atom and the ":" word appends to the code array
+
+```js
+code = [() => binding.value = stack.pop(), () => put(binding.value), () => put(1)]
+```
+
+then it reads the word "+" which is defined in the root environment as:
+
+```js
+root.word['+'] = () => { const [one, two] = stack.splice(-2); put(one + two) }
+```
+
+in a way, the complex-operation word which was defined like:
+
+```oh
+: complex-operation bind number
+   number 1 +
+;
+```
+
+Is internally represented by the interpreter as:
+
+```js
+root.word["complex-operation"] = () =>
+{
+  for (let fun of [() => binding.value = stack.pop(), () => put(binding.value), () => put(1), () => { const [one, two] = stack.splice(-2); put(one + two) } ])
+  {
+     fun()
+  }
+}
+```
+
+If we try to use that word:
+
+```oh
+24 complex-operation
+```
+
+The repl or whatever will evaluate the number 24, which will get pushed on the stack, then evaluate the complex-operation word, which will iterate over that array.
+
+```js
+[() => binding.value = stack.pop(),
+ () => put(binding.value),
+ () => put(1),
+ () => { const [one, two] = stack.splice(-2); put(one + two) } ]
+```
+
+The first function is the setter that bind returned on the stack when compiling, it will take that 24 from the stack and set it to the value of the binding:
+
+```js
+binding.value = 24
+```
+
+The second just pushes the binding.value on the stack, in this case just returning the number again:
+
+```js
+put(binding.value)
+```
+
+Then push 1 on the stack:
+
+```js
+put(1)
+```
+
+Then take two elements from the stack and sum them:
+
+```js
+const [one, two] = stack.splice(-2)
+put(one + two)
+```
+
+And that's all.
+
+The bind word just creates a binding at compile time, registering the word in the environment and appends the setter to the execution code to be executed at runtime.
+
+At compile time the binding can be found even if binding.value has not been set yet (bind initially sets it to 0 anyways) and when the word bind creates in the environment gets executed, will push whatever binding.value is at that time.
+
+Since bind creates the binding and injects the setter into the compilation array, when that code later executes will always set the value to an element from the stack, but the binding is available during the compilation process, since it's just a function pointing to it's own property and this property will get set later, whenever this function executes the setter will have been already executed.
+
+In that example:
+
+```oh
+24 complex-operation
+```
+
+The complex-operation could refer to the word named "number" at compile time even if the "number" is just put(binding.value) and binding.value is not being set until runtime, because "number" is just a function that bind creates in the environment of complex-operation, then that function gets stored in the code array of complex-operation.
+
+in the complex operation array the first function is the setter, so the first thing complex-operation will always do is to take a value from the stack and set that binding.value to whatever came from the stack. Then whenever the "number" word is used inside it's definition will just be the binding function that pushes that value on the stack again.
 
 
 
