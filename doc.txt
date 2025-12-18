@@ -21,9 +21,13 @@ In a way it is a reflection of my current understanding about programming. Every
 
 It grows when my understanding grows.
 
+When my understanding grows and the current implementation does not match my understanding anymore, it gets rewritten from the scratch.
+
 But it also amplifies my understanding.
 
 It is a playground for my mind and a training process to teach me about almost any concept about programming.
+
+I can test any idea without friction, integrate it to the language, combine it, drop it or evolve it.
 
 While showing this interpreter to chatgpt and discussing about it, it told me that it's not really reflecting my understanding, but how i deal with uncertainty and that also mirrors my own learning procedure.
 
