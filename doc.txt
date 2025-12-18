@@ -273,15 +273,18 @@ while ((word = read_word()) !== ")")
 {
   list.push(word)
 }
-stack.push(() => put([...list])
+stack.push(() => put(list.slice())
+// list.slice() is a js idiom to copy a list, similar to the spread operator [...list]
+// but the spread operator chokes with really long lists in v8 at least because it's recursive while slice is not
 ```
 
-* The closure returns a new copy of the list instead of the original one to avoid mutation of that list, so every time you execute the closure that "(" generated, it will return a fresh copy of the list that was been built at compile time.
+* The closure returns a new copy of the list 
+instead of the original one to avoid mutation of that list, so every time you execute the closure that "(" generated, it will return a fresh copy of the list that was been built at compile time.
 
 When "(" receives the ")" token from read word, it stops reading words and generates a javascript closure that when executed will push that array on the stack, then it just pushes this closure on the stack, compile element takes this closure and returns it to the repl and the repl stores it into the array of functions it is gathering. Once the repl knows there is no more input to compile, it will run the functions in this array. In this case the array will contain:
 
 ```js
-[() => put([...list])]
+[() => put(list.slice())]
 
 ```
 
@@ -447,7 +450,7 @@ If the repl had the line ": some-word-name 1 2 3 ;"
 The word definition will be like:
 
 ```js
-env.word.name = () => { for (let fun of [() => put(1), () => put(2), () => put(3)]) { fun() } }
+env.word['some-word-name'] = () => { for (let fun of [() => put(1), () => put(2), () => put(3)]) { fun() } }
 ```
 
 And the repl execution array will be empty, since it only has read ":", compile element returned nothing because ":" is immediate 0, so the repl did not append anything, then the repl calls read word again, but read word returns undefined too, because the line had no more input and the ":" word has exhausted the input itself, reading until a terminating semicolon ";".
@@ -859,6 +862,233 @@ In that example:
 The complex-operation could refer to the word named "number" at compile time even if the "number" is just put(binding.value) and binding.value is not being set until runtime, because "number" is just a function that bind creates in the environment of complex-operation, then that function gets stored in the code array of complex-operation.
 
 in the complex operation array the first function is the setter, so the first thing complex-operation will always do is to take a value from the stack and set that binding.value to whatever came from the stack. Then whenever the "number" word is used inside it's definition will just be the binding function that pushes that value on the stack again.
+
+* Note that bind creates a dynamic binding and that sometimes is not desirable
+
+The word bind can create multiple bindings at once if given a list instead of a name
+
+```oh
+1 2 3 bind (one two three)
+```
+
+Now we have three words that are bound to their respective values and we can use them:
+
+```oh
+one
+two
+three
+```
+
+And we will have [1, 2, 3] on the stack
+
+What bind does since it's an immediate 1 word which means it has to execute at compile time and also return a function, is similar to what it does with one name, but instead of creating one binding and word in the current environment, it creates multiple.
+
+When the repl hits the word "bind" and gives it to compile element, compile element calls it and expects a function to be on the stack after its evaluation, which will return to the repl so the repl adds it to its own compilation array.
+
+The word bind reads a word from the source code by calling read_word, which in this case has returned the word "(".
+
+The word bind checks if the word returned by read word is "(" instead of any other number and calls the build_list function, which is what internally the "(" word actually uses to read until a terminating ")" and returns the generated list.
+
+That means that at compile time, when bind reads a name and the name turns to be an opening parenthesis, it will take this to understand you are giving it a list of names and call build_list, which will start reading until the closing parenthesis and return a list.
+
+Then bind iterates that list to generate the bindings, for every name in the list it generates a binding function
+
+```js
+const binding = () => put(binding.value)
+```
+
+and an entry in the current environment
+
+```js
+env.word[name] = binding
+```
+
+In the case of
+
+```oh
+1 2 3 bind (one two three)
+```
+
+The bind word will receive the list ['one', 'two', 'three'] and iterate them, creating a binding function and an entry in the environment for every name:
+
+```js
+const list_of_names = build_list()
+const bindings = []
+
+for (let name of list_of_names)
+{
+  const binding = () => put(binding.value)
+  bindings.push(binding)
+  env.word[name] = binding
+}
+```
+
+Then it has to return the setter on the stack so compile element takes it and gives it to the repl and the repl will collect it for its own array execution.
+
+The function it returns is like:
+
+```js
+function ()
+{
+  const values = stack.splice(-list_of_names.length)
+  // retrieves the same number of values than names were in the list
+  for (let i = 0; i < list_of_names; i++)
+  {
+    bindings[list_of_names[i]].value = values[i]
+  }
+}
+```
+
+That's the setter that bind puts on the stack for compile element to give to its caller.
+
+The repl will take that and append it to its own execution array.
+
+The code:
+
+```oh
+1 2 3 bind (one two three) 
+```
+
+In the repl execution array gets "compiled" as:
+
+```js
+[() => put(1),
+ () => put(2),
+ () => put(3),
+ () => { this is the setter bind has generated, const values = ...; for (let i...) { bindings[...]...} }] 
+```
+
+It is the same principle as with only one name, the only difference is that it generates multiple bindings and the setter gets multiple values from the stack and sets those bindings.
+
+In a way bind is a hack to provide what could be seen as a variable, it has to be immediate 1 because it needs to delay the setter until runtime, since the values come from the stack at runtime.
+
+If bind were not immediate, it could not generate the entry in the environment so the bindings it generates wouldn't exist after compile time, at runtime when bind executes. So it has to be immediate to be able to inject bindings at compile time.
+
+The only purpose of bind is to help you associate values with names, to avoid stack juggling.
+
+There are words to reorder elements from the stack, swap being the simplest one that just switches the position of the two top stack elements.
+
+```oh
+1 2
+swap
+```
+
+The stack is [1, 2] after executing the functions 1 and 2 generated
+
+Then swap executes and switches their positions, so now the stack is [2, 1]
+
+This word is common in stack based languages and even with bind it is convenient.
+
+The word "dup" creates a copy of the top element from the stack
+
+```oh
+1 dup
+```
+
+That will push 1, then dup will duplicate it so the stack is [1, 1]
+
+With bind we can avoid those words since we take an element from the stack and set it to the binding, then use the binding to retrieve the value
+
+```oh
+1 2 swap
+```
+
+Could be also written:
+
+```
+1 2 bind (one two)
+two one
+```
+
+And
+
+```oh
+1 dup
+```
+
+Could be:
+
+```oh
+1 bind one
+one one
+```
+
+But obviously using swap and dup in those cases is more convenient.
+
+Anyways if we were to use multiple values, bind will associate names with them and we will not have to care about reordering them
+
+```oh
+1 2 3 4 5 6 7
+bind (one two three four five six seven)
+
+one seven +
+four five +
+two six +
+three four +
+```
+
+That would be a nightmare with stack operations
+
+That said, stack based languages should never have more than 3 elements on the stack at a time.
+
+One note about dup and bind itself when duplicating a value.
+
+It's javascript and dup or bind do not make a real clone of a value. If the value is a number or string is immutable by js standards.
+
+But if it's an object or array or whatever mutable, duplicating them will just duplicate a reference, not copy a value.
+
+For example duplicating a list and then mutating it:
+
+```oh
+(1 2 3) dup pop
+```
+
+The word "pop" takes a list from the stack and calls the pop() method on that list, removing the last element of that list and pushing it on the stack. The duplicated copy created by dup will reflect the changes and in the stack the list will be shown missing the last element [[1, 2]]
+
+dup does not prevent mutation because it does not create a copy, just duplicates a reference to the same object.
+
+Same for bind
+
+```oh
+(1 2 3) bind list
+list list pop
+```
+
+That's also why the "(" returns a closure that will create a copy every time, because "(" should act as syntax for a list literal
+
+```js
+() => put(list.slice())
+```
+
+If not, when used in a definition for example and that definition executes multiple times it would return the original list and if it were to be mutated it would reflect the changes
+
+```oh
+: my-list (1 2 3) ;
+my-list pop
+my-list
+```
+
+In this case ":" starts compiling for that word and finds "(" which gives it to compile element and since it's immediate 1 it executes and returns something that ":" will insert.
+
+The execution array of my-list would be:
+
+```js
+[() => put(list.slice())]
+```
+So the my-list will return a fresh copy every time, pop will be operating with that copy instead of the original.
+
+If the "(" instead returned simply
+
+```js
+() => put(list)
+```
+
+The word "pop" would be operating on the original list, then the last call to my-list would push a list with [1, 2] instead of [1, 2, 3]
+
+Since "(" returns a copy every time there is no problem to mutate a list returned by it, but bind and dup will not have this behavior since they do not even care what the value is.
+
+
+
 
 
 

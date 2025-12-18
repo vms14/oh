@@ -1076,7 +1076,7 @@ function interpolate_list (list)
 
 // wds
 
-w['('] = () => { const list = build_list(); put(() => put([...list])) }
+w['('] = () => { const list = build_list(); put(() => put(list.slice())) }
 
 w[':'] = () =>
 {
@@ -1087,7 +1087,7 @@ w[':'] = () =>
 w['wait'] = () => { make_fun = make_async_sub }
 w['no-wait'] = () => { make_fun = make_sub }
 
-w.s = () => { console.log([...stack]) }
+w.s = () => { console.log(stack.slice()) }
 
 w.block = () =>
 {
