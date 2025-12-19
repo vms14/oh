@@ -1091,8 +1091,8 @@ w.s = () => { console.log(stack.slice()) }
 
 w.block = () =>
 {
-  const e = env
-  const code = block()
+  const e = make_env(env)
+  const code = env_block(e)
   put(() => { const old = env; env = make_env(e); code(); env = old })
 }
 

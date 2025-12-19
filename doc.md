@@ -1585,15 +1585,17 @@ The words some random code get compiled at compile time and block stores a refer
 ```js
 w.block = () =>
 {
-  const e = env
-  const code = block()
+  const e = make_env(env)
+  const code = env_block(e)
   put(() => { const old = env; env = make_env(e); code(); env = old })
 }
 ```
 
-That's the definition for block, the block() javascript function is different from the block word, the javascript function is a helper that unifies the creation of a definition, the word ":" uses that function internally and any other thing that creates a definition too.
+That's the definition for the block word, the env_block(environment) javascript function is different from the block word, the javascript function is a helper that unifies the creation of a definition and also takes an environment as argument.
+The, the word ":" uses that function internally and any other thing that creates a definition too.
+There is another function that does not take an environment as argument and instead uses the current environment to compile a block of code which is named block(), but has nothing to do with the word defined in the language named "block".
 
-the block javascript function is that loop we saw in the code of the word ":"
+the block() javascript function is that loop we saw in the code of the word ":"
 
 ```js
 const previous_environment = env
@@ -1611,9 +1613,11 @@ env = previous_environment
 return () => { for (let fun of code) { fun() } }
 ```
 
-Almost any definition does the same since they call the block() function.
+The env_block() function does the same but env is the argument it receives instead of creating a new one.
 
-So when the block word calls the block() function, it starts reading until delimiter (which has a default value of "end") and receives a function representing the compiled code:
+Almost any definition does the same since they call the block() or env_block() function.
+
+So when the block word calls the env_block() function, it starts reading until delimiter (which has a default value of "end") and receives a function representing the compiled code:
 
 ```oh
 block
@@ -1628,6 +1632,153 @@ The block word receives the code compiled for the words "some random code" at co
 ```
 
 Since this function is what gets appended to the compilation array, it will execute at runtime.
+
+At runtime the compiled code for "some random code" will execute inside a runtime environment that inherits from the environment that code was defined in.
+
+the word block executes at compile time and creates a new environment that inherits from the current one and stores it.
+
+`js
+const e = make_env(env)
+```
+
+Then it calls env_block(e) which will start compiling code until it finds the token "end" with that environment the block word generated.
+
+So any definition or whatever in that code between block and end will be compiled in that environment.
+
+Then the block word stores that compiled code and returns a function on the stack, since it's immediate 1.
+
+The function when executed at runtime will create a new environment, set it as the current environment and execute the compiled code there.
+
+Then it will restore the current environment to point back to whatever it was before the execution of the code.
+
+That means that while the compiler has no way to access that environment because it only exists during runtime, delayed lookup and word generation with name: :name will run in that environment.
+
+```oh
+block
+24 :name
+name: 1 +
+end
+```
+
+This compiles a delayed word generation, the :name makes compile atom return a function to the execution array that will generate a word in the current environment at runtime and take an element from the stack, to associate it to a value.
+
+So at runtime when the function returned by compile atom when it found :name it will take the number 24 from the stack and create the word:
+
+```js
+env.word.name = () => put(24)
+```
+
+then the function that compile atom returned for name: will execute
+
+```js
+() => { const word = find('name'); if (word) { word() } }
+```
+
+and the rest is put(1) and the + word
+
+this code was inside the block word, so the block word wraps it into a function that creates a new environment and sets the current environment to point to that environment, so when the function returned by compile atom for :name executes it will create the word in that environment and when the function returned for name: executes it will call find which will start searching the word from that environment.
+
+my dislike with all of this is using the delayed lookup for something is not meant to and the fact is the only way to access a runtime environment.
+
+But mainly that nothing really guarantees that when :name or name: execute, the environment will actually be what we were expecting.
+
+So block has to evolve to something better, or a new word will have to be created or the core of the language has to change to accomodate this.
+
+The main failure is to initially assume that no runtime environments exist and then realize they are convenient and introduce them.
+
+The current design did not care about runtime environments since the purpose was to avoid runtime lookups.
+
+The cool part of this language is that i'm the author so i can redefine it whenever i want.
+
+I just have to decide on which abstraction or solution i want to create.
+
+But to do that i have to play more with the language and test the limitations to see where it fails.
+
+If the solution can be created in terms of an immediate word, it is just to create a js function or even a colon word in the language itself and mark it as immediate.
+
+If not, then the core has to change, that's when i rewrite the whole thing usually.
+
+Still it is likely that the ideas will be tested initially as some immediate word that compiles stuff in a different way or wraps that compilation or whatever.
+
+I like that the core of the interpreter is tiny, since it's actually just one big function if we take compile element and compile atom as one function.
+
+The main problem it has is it's very hard to do even the most simple task with it.
+
+I might need to get used to it though, but it's true that it will force you to emulate the program in your mind when you are reading the code.
+
+It has some cool abstractions, but by default it uses rpn and every token is an action.
+
+You need to keep a mental track of the stack at every step, although the bind word simplifies this a lot.
+
+It has some simple trace mechanism to tell you what's on the stack every time it evaluates a word.
+
+The trace actually overwrites the javascript function that compiles elements into a list.
+
+We have seen how everything, the repl, loading a file, creating a definition, a block, etc, has the same procedure.
+
+Read words, call compile element on them, if compile element returns something store it into an array
+
+Then executing the code is to iterate that array and call all those functions.
+
+The process of checking whether compile element returned a function and storing it into that array is abstracted away by one function that takes the word to give to compile_element and the list to push the value
+
+```js
+function compile_in_list (element, list)
+{
+  const value = compile_element(element)
+  if (value)
+  {
+    list.push(value)
+  }
+}
+```
+
+The functions block() and env_block(environment) use that function internally
+the repl and loading files or tags also use that function.
+
+The trace word overwrites compile_in_list for
+
+```js
+function trace_into_list (element, list)
+{
+  const code = compile_element(element)
+  if (code)
+  {
+    list.push(() => { code(); console.log('trace:', element, ...stack) })
+  }
+}
+```
+
+hijacking the compiling procedure of everything in the interpreter to wrap it in that function.
+
+```oh
+trace
+1 2 +
+```
+the output would be:
+
+```
+trace: 1 1
+trace: 2 1 2
+trace: + 3
+```
+
+The word no-trace just restores compile_in_list again so the interpreter comes back to normal.
+
+The trace mechanism is quite simple and does nothing interesting.
+
+The cool part is that you only pay the performance hit when you actually use trace because it hijacks the whole compiling procedure.
+
+If you do not use it the compiler just stores functions.
+
+While a hack (this language is full of them anyways) i like that i don't have to pay that performance hit if i don't want to, because the moment i make a debugger (which i will need soon) the debugger will perform something similar and any kind of metadata and logging information will only be added and used when the debugger hijacks the compiler like trace does.
+
+It's just switching to a different way of "compiling" which is just to store functions into an array.
+
+When adding metadata in the interpreter you slow it down a lot, which this approach or a cleaner one you only pay that price when you really need it and do not have to make a fast implementation and a slow one.
+
+In the case of trace we are not even modifying the compiling procedure, just wrapping the results.
+
 
 
 
