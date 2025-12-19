@@ -1368,6 +1368,267 @@ I don't know if i explained it properly, but we have just created a wrapper that
 
 The old definition is lost in the root environment, but it is embedded into the code array of the new definition.
 
+And that's why recursion will not normally work and if it's ever added will be an immediate word that compiles a definition in a different way to make it recursive.
+
+There is a way to recurse by delaying the lookup of a word.
+
+compile atom is the fallback of compile element for when a word is not found and it just takes this token and runs a series of checks and regular expressions to see whether this atom is special syntax.
+
+One of the checks is for numbers, compile atom is the one converting the string "1" into a function:
+
+```js
+let value = parseFloat("1")
+return () => put(value)
+```
+
+If compile atom receives a token ending with a colon like in:
+
+```oh
+some-word:
+```
+
+It will take this as a delayed lookup form, meaning that this word will not be looked up in the environments at compile time, but instead it will be delayed until runtime.
+
+```js
+if (atom.endsWith(":"))
+{
+  const name = atom.substr(0, atom.length -1)
+  // removes the ":" at the end
+  return () => { const word = find(name); if (word) { word() } else { error(...) } }
+}
+```
+
+The compile atom function returns a function that will perform the lookup of that word later and execute or trigger an error.
+
+The function find is the one compile element uses to find a word in the environments.
+
+This function is going to call find to retrieve a word from the current environment or its parents at runtime.
+
+There is a catch though, the definitions in this language create a compile time environment that only lives during the compilation of that definition. Any definition doing this will always make the current environment point to the previous environment after it ends compilation, which means that at runtime all definitions ended compilation and none of their environments exist.
+
+That means that with the delayed lookup we will never found the environment of a definition.
+
+At runtime by default the current environment will almost always point to the root environment because all definitions make the env pointer point back to the previous environment and any top level definition will end by restoring the current environment pointer to the root environment since that was the previous environment when they ran.
+
+In the case of a top level word that we want to call with the delayed lookup, it will work because at runtime the current environment points to the root and the delayed lookup will search words at runtime.
+
+```oh
+some-definition:
+: some-definition 1 2 3 ;
+```
+
+This code will work and call some-definition even if we are using it before defining it.
+
+If we didn't use the delayed lookup then compile element will trigger an error because that word was not defined yet.
+
+But since it has that ":" compile atom returns that function to the caller (the repl or whatever) and the caller will append that function to its own execution array.
+
+That means that when we type
+
+```oh
+some-definition:
+```
+
+the repl or whatever calls compile element which fallbacks to compile atom and compile atom returns that function to the repl, which the repl appends to it's execution array.
+
+```js
+const the_repl_execution_array = [() => { const word = find("some-definition"); if (word) { word() } }]
+```
+
+Then the repl will keep compiling stuff and find the ":" word which is an immediate 0 word that executes at compile time and returns nothing, so the repl execution array will keep having only that function, but the function is defined at compile time by ":".
+
+Then the repl will hit end of input and iterate the array calling all the functions, executing the function returned by compile atom.
+
+That function will start searching in the root environment and will find the word defined there so it will execute it.
+
+This implies also that a word can recurse using that method.
+
+```oh
+: run-for-ever run-for-ever: ;
+run-for-ever
+```
+
+But it's expensive since every time the word executes will have to look at the chain of environments to find the word.
+
+Here is where the friction on the goals of the compile element procedure starts.
+
+compile element and the definitions themselves do not expect any environments at runtime.
+
+Runtime is supposed to be only an array of functions being iterated.
+
+compile element and compile atom try their best into taking decisions at compile time to allow the runtime to be just calling functions in an array, at the end compile element is the whole interpreter.
+
+The delayed lookup mechanism breaks this assumption and also expects environments at runtime.
+
+By default at runtime the only environment expected to exist is the root environment.
+
+The design of the language assumes that runtime environments do not exist and that the only environment that should survive until runtime is the root environment.
+
+I have three words that are actually a hack and break all of this design.
+
+The first and simplest one is the word "block"
+
+The word block tries to create something that behaves like true lexical scope at runtime.
+
+The word block is an immediate 1 word, which means that executes at compile time and returns a function that will get appended to whatever we were compiling.
+
+It just compiles a block until it sees the word "end" and pushes a function that will create a new environment at runtime, set it as the current environment, evaluate the code and restore the current environment to the previous one.
+
+This together with the delayed lookup provides some fake lexical scope, since if we produce code that has a delayed lookup and execute this code inside the block wrapper, the lookup will be performed in the environment that has been created at runtime.
+
+This interface is experimental and has to evolve, because there is a mismatch with the rest of the interpreter with this concept.
+
+The main reason is that we wanted to avoid lookup at runtime and now we are breaking this goal.
+
+Also the block feature is a hack because we are relying on a delayed lookup and nothing really guarantees that by just delaying a lookup it will be done in the place we expect.
+
+It is also not correct and not good for performance, since every time the delayed lookup executes will have to search through the chain of parents.
+
+It is mainly an afterthought and the current implementation did not expect that to exist.
+
+That's also the reason i keep rewriting it from scratch, since this is already conflicting with the core of the language.
+
+The core of the language is compile element, the rest is just immediate words.
+
+A new experiment or feature can be added without touching the core, because an immediate word can do whatever it wants.
+
+For example if we wanted to provide recursion we just make an immediate word that compiles stuff in a different way.
+
+We do not need to touch the core, compile element will find our word, execute it and there we do whatever we have to do.
+
+The runtime environments though are an afterthought and might end changing the design of the interpreter or not.
+
+The main conflict is the interpreter did not want to provide runtime environments and we are hacking our way through delayed lookups.
+
+This concept has to grow and i have to experiment with that but the main problem is everything assumed we will precompute and cache all the decisions at compile time.
+
+And that is no longer true
+
+compile atom provides 3 kind of syntax for delayed lookup and delayed creation of a word.
+
+```oh
+:name
+```
+
+This would append to the execution array a function that will create a word in the current environment at runtime associated with a value from the stack.
+
+At runtime it will take a value from the stack and create a word named "name" in the current environment that when executed will push that value on the stack:
+
+```js
+if (atom.startsWith(':'))
+{
+   const name = atom.substr(1)
+   return () => { const value = get(); env.word[name] = put(value) }
+}
+```
+
+That returned function will execute at runtime.
+
+That means the word it creates will not exist until this function executes at runtime, so compile element will never find it at compile time unless compile element is being called at runtime
+
+The other syntax is when a word has a colon in both the end and the start
+
+```oh
+:name:
+```
+
+It's just a variation of :name but will also push the value on the stack at runtime
+
+```js
+() => { const value = get(); env.word[name] = put(value); put(value) }
+```
+
+It's just a shorthand to avoid
+
+```oh
+:name name:
+```
+
+Which at runtime will take a value from the stack, generate the word "name" that will push that value on the stack, then name: will perform the lookup of that word at runtime and execute the word.
+
+This is the main interface for delayed lookups.
+
+The delayed lookup mechanism does not really bother me, what bothers me is abusing that or having to use that at all to provide runtime environment lookups with the block word and the fact that right now is the only way to make the block word work.
+
+Since the block word wraps a block of code and at runtime before evaluating this code creates a new environment, the delayed lookup is the only way to access this environment, since this environment only exists at runtime and compile element has no way to access it unless it delays the lookup of the word.
+
+It has to evolve to avoid relying on that, but the current implementation does not adress this issue.
+
+The main problem i have is that delaying a lookup and wrapping that delayed lookup in a block that will create an environment at runtime is not safe at all.
+
+Nothing guarantees that the lookup will execute in the right moment.
+
+Obviously if we do:
+
+```js
+env = make_env(env)
+delayed_lookup()
+env = previous_env
+```
+
+We are kind of sure that delayed_lookup() will execute in that new environment.
+
+The block word does the same thing, but does not know what a delayed lookup is, it just wraps an already compiled block of code
+
+The block word executes at compile time, when executing it first captures a reference to the current environment.
+
+Then it compiles a block like the word ":" does, but with the word "end" as delimiter instead of ";"
+
+```oh
+block
+ some random code
+end
+```
+
+The words some random code get compiled at compile time and block stores a reference to this code.
+
+```js
+w.block = () =>
+{
+  const e = env
+  const code = block()
+  put(() => { const old = env; env = make_env(e); code(); env = old })
+}
+```
+
+That's the definition for block, the block() javascript function is different from the block word, the javascript function is a helper that unifies the creation of a definition, the word ":" uses that function internally and any other thing that creates a definition too.
+
+the block javascript function is that loop we saw in the code of the word ":"
+
+```js
+const previous_environment = env
+env = make_env(env)
+const code = []
+while ((word = read_word() !== delimiter))
+{
+   value = compile_element(word)
+   if (value)
+   {
+     code.push(value)
+   }
+}
+env = previous_environment
+return () => { for (let fun of code) { fun() } }
+```
+
+Almost any definition does the same since they call the block() function.
+
+So when the block word calls the block() function, it starts reading until delimiter (which has a default value of "end") and receives a function representing the compiled code:
+
+```oh
+block
+some random code
+end
+```
+
+The block word receives the code compiled for the words "some random code" at compile time, then since its immediate 1 it returns a function which was:
+
+```js
+() => { const old = env; env = make_env(e); code(); env = old }
+```
+
+Since this function is what gets appended to the compilation array, it will execute at runtime.
+
 
 
 
