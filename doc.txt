@@ -1087,6 +1087,290 @@ The word "pop" would be operating on the original list, then the last call to my
 
 Since "(" returns a copy every time there is no problem to mutate a list returned by it, but bind and dup will not have this behavior since they do not even care what the value is.
 
+About bind being dynamic, the dynamic nature of bind is that it's just a function acting as a cell.
+
+Whoever has a refernence to that function can access that value and that value will propagate to anything that has a reference to it.
+
+The binding is just a function that will push its cell value to the stack at runtime, whatever this value is.
+
+This value will always be set to whatever value the last setter operation mutated it with.
+
+```oh
+1 bind number
+```
+
+Now number is that binding function that in a way could be represented as:
+
+```js
+env.word.number = () => put(env.word.number.value)
+```
+
+The word "set" is a mutator word, it can take those bindings and alter their value:
+
+```oh
+24 set number
+```
+
+The word "set" is an immediate 1 word and does a similar trick to the one bind uses.
+
+It executes at compile time and reads a word, then it looks that word in the current environment at compile time and stores a reference:
+
+```js
+const name = read_word()
+const the_binding = env.word[name]
+```
+
+Then it pushes a function on the stack for compile element to return to its caller that will set that binding at runtime:
+
+```js
+put(() => the_binding.value = get())
+```
+
+Which compile element returns to the repl or whatever is calling it and the caller appends to its execution array.
+
+So at compile time the word has been found and stored in a reference, then at runtime we use that reference to update the value.
+
+Since bind is an immediate word that registers that binding in the current environment at compile time, any code that comes after it will be able to see that word. This includes inner definitions.
+
+```oh
+1 bind number
+
+: complex-operation number 1 + ;
+
+complex-operation
+```
+
+The top level defines number in the root environment.
+
+When the ":" word compiles the complex-operation and finds the word named "number" it gives that to compile element.
+
+Since the current environment at this compile time is the environment for the complex-operation word and this environment inherits from the parent, which is the root environment, it will find that binding and push it to the compilation array of the complex-operation word.
+
+Since anything that can access this binding can mutate it, the inner definitions can use the set word to mutate it and the word will reflect this change everywhere it is used.
+
+```oh
+1 bind number
+
+: mutate-the-number 24 set number ;
+
+mutate-the-number
+
+number
+```
+
+The word mutate-the-number will execute and the set word at runtime will perform:
+
+```js
+the_binding.value = get()
+```
+
+Setting it to 24 since we just pushed that number before the setter function that set returns
+
+So now the_binding.value = 24
+
+Then at the top level when we use the word "number", the only thing it will do is:
+
+```js
+put(the_binding.value)
+```
+
+Which was set to 24.
+
+This is dynamic behavior, but due how the compiler and compile time environments word, it is also tied to the lexical rules of the compiling procedure.
+
+That means that if an inner definition defines a binding with the same name, it will use that binding instead of the top level one.
+
+```oh
+1 bind number
+
+: complex-operation
+  24 bind number
+  number 1 +
+;
+
+complex-operation
+number
+```
+
+Even if the bindings are dynamic in nature, the references in this case are different, since complex-operation created a new binding.
+
+At the top level we define the binding for number in the root environment:
+
+```js
+root.word.number = () => put(root.word.number.value)
+```
+
+Then the ":" starts compiling, creates a new environment at compile time that inherits from the root environment and sets it to become the current environment.
+
+Then the 24 gets converted to () => put(24) and appended to the compilation array of the complex-operation word.
+
+Then the bind word executes at compile time, creating a new binding and registering it to the current environment.
+
+At this moment the current environment is the environment for the complex-operation word, so the bind word registers it there.
+
+The bind word also pushes the setter on the stack at compile time, which compile element will return to the ":" and the ":" will append to the complex-operation code array
+
+```js
+const the_reference_of_the_binding = complex_operation_env.word.number
+code = [() => put(24), the_reference_of_the_binding]
+```
+
+Note that this reference is not the same reference the root environment has, it's a different binding that exists only in the environment for the complex-operation word.
+
+Then the ":" keeps compiling and finds the "number", the "1" token and the "+" word
+
+So the code array of the complex-operation word is:
+
+```js
+code = [() => put(24),
+        the_reference_of_the_binding,
+        () => put(the_reference_of_the_binding.value),
+        () => put(1)
+        () => { const [one, two] = get2(); put(one + two) }] // the "+" word
+```
+
+That means that complex-operation will never use the binding of the root environment, but its own binding instead.
+
+Only children of complex-operation and complex-operation itself will be able to access to that binding. The rest will find the root env binding instead.
+
+```oh
+1 bind number
+
+: complex-operation
+  24 bind number
+  number 1 +
+;
+
+: another-operation
+  24 set number
+;
+
+complex-operation
+another-operation
+```
+
+In this case complex-operation is creating its own binding like before, but another-operation is modifying the binding of the root environment.
+
+So after evaluating complex-operation, the number binding of the top level is still 1, because complex-operation creates its own
+
+But after evaluating another-operation, the number binding of the top level is now 24, since another-operation uses set and set took the binding from the root environment.
+
+If we create an inner definition inside complex-operation, since complex-operation creates its own binding in its own environment and the inner definition will create its own environment and inherit from the environment of complex-operation, set at compile time will find the binding in the environment of the complex-operation binding instead of the root one.
+
+```oh
+1 bind number
+
+: complex-operation
+  24 bind number
+  : even-more-complex-operation
+    3 set number
+  ;
+  even-more-complex-operation
+  number
+;
+
+complex-operation
+```
+
+The even-more-complex-operation word will use the binding of the complex-operation word, never the top level one since there is a binding in a closer parent than the root, the complex-operation environment.
+
+That means that the top level number will be 1, since nothing is mutating it.
+
+And the number of the complex-operation even if initially set to 24, gets mutated later to 3
+
+A similar word to bind exists for when we only want to declare a binding, but not give it a value.
+
+```oh
+0 bind number
+```
+
+Is equivalent in a way to:
+
+```oh
+declare number
+```
+
+The word declare is an immediate 0 word, it does not have to set the value at runtime, it just creates a binding and initializes it to 0
+
+It also works with a list of names like bind does:
+
+```oh
+declare (one two three)
+```
+
+But one two and three will be bindings set to 0
+
+It is used when you want to set the values later, but create the binding in the current environment at compile time.
+
+The reason bind is immediate 1 and declare immediate 0 is because bind needs to set the value with an element from the stack at runtime and has to delay that setting for the runtime while creating the binding at compile time, so it pushes the setter to the compilation array to ensure this value will be set properly in the right moment.
+
+Since declare does not expect any value and has to initialize it to 0, it does not have to perform that hack.
+
+Those bindings are dynamic in nature, but due to how the compilation procedure works, they achieve some sort of lexical scope. In a way they are both things at the same time.
+
+The bindings created by bind or declare and mutated by set will usually work without problem as long as you take them as temporal helpers to associate values on the stack to names, if you try to use them as normal variables for the most part will be fine unless if you are involved in recursion. Recursive definitions will show the dynamic nature of those bindings and will not work as expected in usual lexically scoped languages since you are not creating a new binding every time the definition recurses, but reusing one that was generated at compile time.
+
+That by default does not matter since the compiler does not even know what recursion is.
+
+compile element will trigger an error if a word does not exist in the environments and is not syntax sugar provided by compile atom.
+
+That means that there are no forward references by default.
+
+Recursion if ever added will be in form of an immediate word that compiles an execution array and iterates it.
+
+By default recursion is assumed to not even exist.
+
+```oh
+: some-word-name
+  1 2 3 some-word-name
+;
+```
+
+You might expect this to recurse, but some-word-name is not defined the moment is found in its definition and compile element takes this as an error.
+
+If the word existed before, compile element will freeze that definition in the code array of whatever we are compiling so:
+
+```oh
+
+: some-word-name 1 2 3 ;
+
+: some-word-name some-word-name ;
+
+```
+
+This is actually creating a wrapper over the old definition.
+
+At first some-word-name is:
+
+```js
+env.word['some-word-name'] = () => { for (let fun of [() => put(1), () => put(2), () => put(3)]) { fun() } }
+```
+
+Then we redefine it, but in the definition we are taking a reference to the old definition
+
+When the ":" runs the second time and starts compiling that word again, it will see in its definition the name of the word 'some-word-name', which will give to compile element and compile element will just return
+
+```js
+return env.word['some-word-name']
+```
+
+Which ":" will store in the compilation array it is generating and then create the function
+
+```js
+const the_frozen_definition = env.word['some-word-name']
+// That was actually returned by compile element
+// The frozen definition actually is: () => { for (let fun of [() => put(1), () => put(2), () => put(3)]) { fun() } }
+// now the second ":" defines the word again:
+env.word['some-word-name'] = () => { for (let fun of [the_frozen_definition]) { fun() } }
+```
+
+I don't know if i explained it properly, but we have just created a wrapper that contains the old definition.
+
+The old definition is lost in the root environment, but it is embedded into the code array of the new definition.
+
+
+
+
 
 
 

@@ -1201,6 +1201,9 @@ w.end = () => { error('end found outside a block or in if without then') }
 w.nop = () => {}
 w.find = () => put(find(get()))
 
+w.pop = () => put(get().pop())
+w.shift = () => put(get().shift())
+
 w.promise = () =>
 {
   const e = make_env(env)
