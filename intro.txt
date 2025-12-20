@@ -1,0 +1,164 @@
+Welcome to the 'oh' Playground: A Beginner's Guide
+
+Introduction: More Than a Language, It's a Playground
+
+Welcome! You're about to explore 'oh', a unique programming language designed not just for building applications, but as a "playground for your mind." It's a space to experiment with ideas, see how a language is built from the inside out, and fundamentally change your perspective on how code can work.
+
+The goal of this tutorial is to demystify its core ideas step-by-step. We won't try to learn everything at once. Instead, we'll build a solid foundation by focusing on the three most important concepts you need to grasp:
+
+1. The Stack: The central workspace where all data lives.
+2. Compile Time vs. Runtime: The two distinct "worlds" of 'oh' program execution.
+3. Defining Words: How to teach 'oh' new commands of your own.
+
+By the end, you'll have the mental model you need to start playing and exploring on your own. Let's begin with the heart of the language: the stack.
+
+1. The Stack: Your Mental Workspace
+
+At its core, 'oh' is a stack-based language that uses Reverse Polish Notation (RPN). Don't let the fancy terms intimidate you. The concept is incredibly simple and intuitive.
+
+Imagine a stack of plates. You can only do two things: place a new plate on top, or take the top plate off. You can't pull a plate from the middle or the bottom. This "Last-In, First-Out" (LIFO) structure is exactly how the 'oh' stack works.
+
+In 'oh', every token (a number, a word, a symbol) you type is an action. The interpreter's main job is to read these tokens and collect them as a list of functions to be run later. When you type a number, the interpreter creates a function whose action is "push this number onto the top of the stack."
+
+Let's see it in action. If you enter 1 2 3, the interpreter first compiles this into an array of functions: [function_for_1, function_for_2, function_for_3]. Then, at runtime, it executes them in sequence:
+
+1. The function for 1 runs, pushing 1 onto the stack.
+2. The function for 2 runs, pushing 2 onto the stack.
+3. The function for 3 runs, pushing 3 onto the stack.
+
+Code: 1 2 3
+
+Stack State (after runtime): [1, 2, 3] (The top of the stack is on the right)
+
+That's it! You've just learned the most fundamental rule of 'oh'. You now know how to put data into your workspace. But just putting numbers on a stack isn't very useful. We need a way to do things with them.
+
+2. Speaking in 'oh': Words are Actions
+
+If numbers are the nouns (the things), then "words" are the verbs (the actions). Words in 'oh' are commands—pre-defined functions that typically operate on the values currently at the top of the stack. They take items off, do something with them, and often push a result back on.
+
+Let's meet three of the most essential words.
+
+Word	Description	Example
++	Pops the top two numbers, adds them together, and pushes the sum back onto the stack.	Before: [5, 10] <br/> After: [15]
+swap	Swaps the positions of the top two items on the stack.	Before: [1, 2] <br/> After: [2, 1]
+dup	Duplicates the item currently at the top of the stack.	Before: [5] <br/> After: [5, 5]
+
+By combining numbers and words, we can perform calculations. Let's trace the execution of 5 dup * (which calculates 5 squared) to build your mental model.
+
+Step 1: Compile Time The interpreter reads 5 dup * and compiles it into an array of functions: [function_for_5, function_for_dup, function_for_*].
+
+Step 2: Runtime The interpreter executes these functions one by one.
+
+1. Initial Stack: [] (Empty)
+2. Action: function_for_5 runs.
+3. Action: function_for_dup runs.
+4. Action: function_for_* runs.
+
+You're now performing operations! But to truly understand 'oh', we need to look closer at that crucial distinction: the difference between preparing your instructions and actually carrying them out.
+
+3. The Two Worlds of 'oh': Compile Time vs. Runtime
+
+'oh' processes your code in two distinct phases, and understanding this separation is the key to unlocking its power.
+
+To understand the difference, let's use an analogy. Imagine a chef in a professional kitchen.
+
+* Compile Time is like the chef's mise en place—the preparation phase. The chef reads the recipe, chops all the vegetables, measures the spices, and lines up every prepared ingredient in small bowls. No cooking is happening yet, but all the steps are being prepared for rapid execution later.
+* Runtime is the actual cooking. The chef, with all ingredients prepped, grabs the bowls in sequence and executes the recipe's steps—sautéing, simmering, plating. This is when the final dish is actually created.
+
+In 'oh', "compiling" isn't about creating a machine-code executable; it's about delaying execution. 'oh' reads your code and translates each part into a ready-to-go function, storing them in an array. This has a powerful benefit: it "freezes" definitions. By compiling a word's definition into a fixed array of functions, 'oh' ensures that the word's behavior is locked in, even if its component parts are redefined later.
+
+Phase	Description	Analogy
+Compile Time	Reads your code (tokens) and converts it into an array of functions—a sequence of actions to be performed later. This is where decisions are made and definitions are "frozen."	The chef preparing ingredients (mise en place).
+Runtime	Executes the functions in the compiled array, one by one, in order. This is when the stack is actually modified and the real work happens.	The chef cooking the dish.
+
+This might seem abstract, but it's what allows 'oh' to be so flexible. Most words are prepared during compile time to be executed at runtime. However, some special words break this rule and run only during compile time to teach the interpreter new tricks on the fly.
+
+4. Teaching 'oh' New Tricks: Defining Words
+
+One of the most powerful features of 'oh' is the ability to define your own words. You do this using the colon (:) word. This is our first encounter with a clever distinction 'oh' makes that unlocks everything: there are two types of special words that run during compile time.
+
+The colon is an immediate 0 word. Let's break that down:
+
+* Immediate: This means the word executes instantly during compile time (the "preparation" phase), not at runtime.
+* Type 0: This means its job is to perform a side effect (like teaching the interpreter a new word), and after it runs, it contributes nothing to the main execution array. It simply does its job and disappears.
+
+The : word's job is to teach the interpreter a new command before the main program runs. The syntax looks like this:
+
+: push-three-numbers 1 2 3 ;
+
+
+Let's break down what happens purely at compile time:
+
+1. The interpreter's core, compile_element, reads :. It recognizes this as an immediate 0 word and executes it instantly.
+2. The : word's logic begins. It reads the next token, push-three-numbers, as the name of the new word.
+3. It then continues reading (1, 2, 3) and compiling them into an array of functions until it sees the semicolon (;). The result is a familiar function array: [() => put(1), () => put(2), () => put(3)].
+4. Finally, it saves the new word push-three-numbers and its associated logic into the 'oh' dictionary (called an environment), making it a known command.
+
+Because : is an immediate 0 word, the definition is created and stored entirely during the compile phase. The : definition itself isn't added to the main execution list.
+
+Now, later in your code, at runtime, when you use your new word:
+
+Code: push-three-numbers
+
+Action: The interpreter looks up push-three-numbers, finds its definition (which is to run the stored array of functions), and executes them in sequence.
+
+Stack: [1, 2, 3]
+
+You've successfully taught 'oh' a new trick! Defining words is powerful, but as operations get more complex, managing a long list of unnamed values on the stack can become tricky. This is where our next concept comes in.
+
+5. Giving Names to Things: The bind Word
+
+Constantly using words like swap to rearrange the stack is often called "stack juggling." To avoid this, 'oh' provides the bind word, which allows you to take a value from the stack and associate it with a name.
+
+Like :, bind is an immediate word, but it's the other type: an immediate 1 word. This is a brilliant piece of language design that allows bind to work across both compile time and runtime.
+
+* Immediate 1: This means the word executes instantly during compile time, but with a special requirement: it must create and push a function onto the stack. The interpreter's core, compile_element, knows to pop this function off the stack and add it to the main execution array.
+
+Let's examine a simple example: 24 bind twenty-four.
+
+At Compile Time (The Preparation)
+
+1. compile_element sees bind (an immediate 1 word) and executes it right away.
+2. bind reads the next word from your code: twenty-four.
+3. It immediately creates a new word definition for twenty-four in the current environment. This new word is a special function that, when run, pushes its own stored value onto the stack. In JavaScript, it looks like this: const binding = () => put(binding.value).
+4. Here's the trick: bind also creates a separate "setter" function whose only job is to pop a value from the stack at runtime and assign it to the binding.value. It then pushes this setter function onto the stack.
+5. Because bind is an immediate 1 word, compile_element pops this setter function from the stack and adds it to the main execution array.
+
+At Runtime (The Cooking)
+
+The compiled execution array for 24 bind twenty-four looks like [function_for_24, setter_function].
+
+1. The function_for_24 runs, pushing the number 24 onto the stack. The stack is now [24].
+2. Next, the setter_function runs. It pops the 24 from the stack and assigns it as the value for the twenty-four word.
+
+Let's see this in a real definition to make it concrete.
+
+: complex-operation bind number
+  number 1 +
+;
+
+24 complex-operation
+
+
+Here's the flow when 24 complex-operation is run:
+
+* The main runtime loop first executes the function for 24, pushing it onto the stack.
+* Next, it executes the function for complex-operation, which begins running its own internal sequence of functions:
+  1. The setter from bind number runs first. It pops 24 from the stack and assigns it to the number binding.
+  2. The number word runs. This is the binding function created by bind. It pushes its stored value (24) back onto the stack.
+  3. The function for 1 runs.
+  4. The function for + runs, popping 24 and 1, adding them, and pushing the result.
+
+The key takeaway is that bind is a brilliant hack: it creates the name for a value at compile time so you can refer to it in your code, but it cleverly delays grabbing the actual value from the stack until runtime.
+
+6. Your Journey Continues...
+
+Congratulations! You've just grasped the foundational concepts of the 'oh' programming language. You've learned:
+
+* How 'oh' code is compiled into an array of functions that operate on a stack.
+* The critical difference between compile time (preparation) and runtime (execution).
+* How to create your own commands by defining words (:) and give names to values using bindings (bind), and the clever immediate 0/1 mechanism that makes it all work.
+
+These principles are the bedrock upon which everything else in 'oh' is built. They are the foundation for more advanced features like creating list syntax with ( ), interacting with web pages using dom, and even handling asynchronous code with wait.
+
+Remember, 'oh' is designed to be a personal playground. The best way to learn is to experiment. Play with the concepts you've learned here. Try to build small words, manipulate the stack, and see how the pieces fit together. Your journey has just begun!
