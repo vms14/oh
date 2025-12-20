@@ -2197,6 +2197,117 @@ The only difference is that a word will be available to reuse that block.
 
 That word when executed will create a new environment at runtime every time is executed, then execute the code inside that environment.
 
+
+The dom word is the only reason the block and defun words exist and also the only reason delayed lookup actually exists.
+
+The dom word generates javascript document objects and is an abstraction over the document object model api of javascript.
+
+When using that api you usually want to create components.
+
+The word "component" should be an immediate word that does not exist yet.
+
+The component word is where my current understanding when writing this file has not reached yet.
+
+It is the proper bridge between compile time and runtime fresh environments.
+
+Right now i have block and the delayed lookups and this is why they are a hack.
+
+The dom word asks me for runtime environments because when creating those objects you want sometimes state bubbles.
+
+A component that can be generated at runtime as result of some computation with code that can access that runtime environment.
+
+The component word will be the evolution of the block and defun words, but i do not want to create it without a proper bridge, so i have those hacks to make them explode and realize better how the component word should actually be and whether should or not affect the core or just be an immediate word.
+
+If something affects the core will push me towards rewriting the whole thing, which happens like every month.
+
+Rewriting for me is patching for you.
+
+I just hate patching code because i fix some part and break 3 things, then i fix those things and break more and so on.
+
+I have a short threshold that when reaches the limit forces me to rewrite.
+
+Immediate words are extensions for compile element so i can test random stuff without affecting the core.
+
+They can read words, compile them normally or in a weird way, do whatever and also inject behavior for the runtime to do something later if they are immediate 1
+
+They extend the language in any way and never push me towards rewriting the code because the core does not care about any of those words.
+
+The component word is where my understanding ends and if it's an immediate word the core will not change.
+
+But it's the solution of my initial mistake when making this version of the interpreter assuming runtime environments will not exist.
+
+The block and delayed thingy is me telling to the dom word:
+
+```
+We have runtime environments at home
+```
+
+The runtime evironments at home:
+
+```oh
+block
+(button "If you press me i will explode"
+ @click (this code gets compiled in the runtime environment of block)) dom to-body
+end
+```
+
+If the dom word finds a list for the @click handler it will compile the list using the current environment.
+
+Since the dom word is not immediate and executes at runtime, taking a list from the stack, anything that defines or compiles will be using the current environment and the block word is creating a new environment at runtime and executing the dom word inside that environment.
+
+So every word the dom word defines with writer, reader or the :name syntax, and any list compiled with the @ directive will be defined in that environment.
+
+The dom word is a runtime word that can suddenly start compiling random stuff at runtime.
+
+That's why the component word should be a proper bridge or controlled way to do this.
+
+It will exist eventually or the language itself will change to provide this in a better way.
+
+Right now i have to play with compilation at runtime in random weird environments and see how they explode, to find a general abstraction to provide.
+
+Which means using block and the delayed lookups and push them to see how confusing they can get i guess.
+
+But that's where my current understanding is i guess.
+
+I find it confusing to start compiling things at runtime.
+
+It wasn't until the block word.
+
+Now you can compile stuff but not know in what environment.
+
+Initially at runtime the only environment expected was the root environment.
+
+So compiling something at runtime meant the same as compiling at the top level.
+
+The block word changes this assumption and now you can compile stuff inside a block and any word compiled will be compiled in an environment that only exists at runtime and you can use to save state.
+
+But the block does not enforce anything and does not guarantee that your code will actually compile definitions in the current environment.
+
+While it might be cool, i would like an alternative that ensures i'm going to use the exact environment i was expecting to use.
+
+Also the delayed lookup is the only way to access a block or defun runtime environment, which is not cool.
+
+The compiler did not expect runtime environments and the delayed lookup is a hotfix for that.
+
+An immediate word could create a definition or new syntax for bridging this, but the solution is not in my mind yet.
+
+So that's the current state of the language in a way.
+
+The limitation of the current implementation is the initial assumption of compile time only environments, that while is a cool goal, the dom word shows the need for runtime environments and there is no proper interface to compile code for those environments.
+
+A word could do that, but does not exist yet since i do not know what the proper interface should be at the time of this writing.
+
+The cool part of this interpreter is that once i take a decision it is just to add a function in js or a word in the language.
+
+An alternative for bind/declare for runtime environment scopes would also be cool.
+
+Recursion is not implemented yet, if it ever comes it will in the form of an immediate word
+
+Recursion will also need a solution for runtime environments.
+
+the bind word should not be used for recursion or loops unless you understand the dynamic feature and why those bindings shouldn't be used in those cases and why those bindings are not real variables.
+
+
 There is a word named "module" that compiles code inside an environment.
 
 The module word reads a name for a word that will associate with this environment.
