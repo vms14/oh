@@ -6,6 +6,23 @@ What i think, what i know, why exists, how it works, etc.
 
 But there will be no particular order and all thoughts will be scattered, so it is a raw brain dump.
 
+The name of the language is "oh"
+
+"oh" and "meh" are my "foo" and "bar"
+
+the same way "oh my cat is very nice" is my lorem ipsum
+
+So instead of "foo.js"
+
+The file is "oh.js"
+
+Instead of a command named "foo", the command that loads "oh.js" is named "oh"
+
+Actually the command is an alias in my .profile
+
+```bash
+alias oh='rlwrap -a -n node /home/vms/oh/oh.js'
+```
 
 ### What this language is?
 
@@ -1779,7 +1796,410 @@ When adding metadata in the interpreter you slow it down a lot, which this appro
 
 In the case of trace we are not even modifying the compiling procedure, just wrapping the results.
 
+Another place were a similar kind of hack appears is in the auto await mode of the interpreter.
 
+I have been showing several times how we iterate through an array of precomputed functions and evaluate them.
+
+We gather them into a list, then later we execute them.
+
+The tracing thingy hijacks the gathering into the list.
+
+The autoawait mode hijacks the generation of the function that iterates that list.
+
+I have been showing this several times:
+
+```js
+for (let fun of code) { fun() }
+```
+
+An that always has been the runtime. The moment something executes.
+
+Turns out that is such a common pattern in this interpreter that a function handles this by taking a list and returning that function:
+
+```js
+function make_sub (list)
+{
+  const compiled_unit = () => { for (let element of list) { element() } }
+  return compiled_unit
+}
+```
+
+So anything that defines something and uses compile_into_list, will later give that list to make_sub to turn it into a function that iterates that list and calls all the functions in it.
+
+The word "wait" overwrites that function and changes it to this one:
+
+```js
+function make_async_sub (list)
+{
+  const asynchronous_compiled_unit = async () =>
+  {
+    for (let element of list)
+    {
+      element();
+      if (stack[stack.length - 1] instanceof Promise)
+      {
+        const promise = stack.pop()
+        try
+        {
+          const result = await promise
+          if (result !== undefined)
+          {
+            put(result)
+          }
+        }
+        catch (e)
+        {
+          catch_code(e)
+        }
+      }
+    }
+  }
+  return asynchronous_compiled_unit
+}
+```
+
+It is the latest hack and the most experimental of all together with the runtime environments.
+
+It generates a javascript async function that when executed will iterate that list of functions, but every time it executes one of them it checks on the stack whether there is a promise on top.
+
+If there is a promise it awaits it and pushes the result of awaiting it on the stack.
+
+Since it's an async function in javascript when it uses await on the promise it will stop execution until this promise resolves or rejects.
+
+This means that the moment you execute the immediate 0 word named "wait" it changes the way the compiler works and not it starts generating async functions that will wait for promises on the stack, so every function inside that list that pushes a promise on the stack as the last result will make the execution at runtime wait for that promise.
+
+The most obvious example is using fetch to make a query.
+
+The word "fetch" is just the javascript function fetch accepting one argument (the url) and pushing a promise on the stack
+
+```oh
+'https://www.oh.com/oh.js fetch
+```
+
+That url does not exist but it will return a promise.
+
+We could manage that promise and call a then method or whatever, but we can just use the auto await mode instead.
+
+```oh
+wait
+
+'https://www.oh.com/oh.js fetch -text log
+```
+
+The "-text" thingy is a method call on whatever is on the stack. It is provided as syntax sugar for compile atom
+
+In this case is
+
+```js
+put(get().text())
+```
+
+So it is calling the text() method without arguments on the result that the promise of fetch gave after awaiting it.
+
+Since fetch pushed a promise on the stack with auto await mode, that async function has awaited that promise and pushed the response object on the stack (if it were to be a correct url)
+
+Then we are calling the text() method on that response object and pushing the result of that method on the stack.
+
+The text() method of a response object returns another promise, so we have just pushed another promise on the stack and made the async function await it and push the awaited result on the stack which we give to the "log" word which is just
+
+```js
+env.word.log = () => console.log(get())
+```
+
+So if the fetch were to give an ok response object it would print the text on the console.
+
+This is experimental in the sense that is a new feature that has to be pushed in different situations to evolve, exactly like the runtime environments which currently only allow access through the delayed binding hack.
+
+There is the implication that if we load an entire file and say "wait" on the top level, it affects the entire file.
+
+The problem is that those are immediate words and execute at compile time, changing the compile mode to auto await on the fly and there is no proper boundaries for that and the fact that we load an entire file is not helping.
+
+I mean, the "no-wait" word turns back to normal compilation in the same sense "no-trace" does.
+
+But when compiling any input, even if it's the repl or loading a file we will not generate that function until we find the end of input.
+
+That means that:
+
+```oh
+wait
+
+some words are getting compiled here
+
+no-wait
+```
+
+You might think those words are getting compiled in auto await mode and after that we switch back to normal.
+
+But this is not true because while those words are getting compiled and stored into an array, the async_make_sub auto await thingy will not be called until we reach the end of the input, the moment we generate that function that iterates the array.
+
+Same for any definition when they reach the end delimiter.
+
+Even if wait and no-wait are immediate 0 and execute at compile time and that's when they replace the function that generates that array iteration function, that function will not be called until the end of the compilation.
+
+So those words got compiled into the normal mode because we switched back to normal just before calling the function that generates the array iterator.
+
+The same mistake would be in a colon definition if we do:
+
+```oh
+: some-word
+  wait
+  1 2 3
+  no-wait
+;
+```
+
+Because the set it to auto await, compile some words into the array, then set it to no-wait back and after the ";" semicolon is when we actually use the overwritten function.
+
+Note that will work properly if we just put the no-wait after the semicolon, then when ":" calls the function to generate the iterator it will still be the auto await function.
+
+```oh
+: some-word
+  wait
+  1 2 3
+;
+no-wait
+```
+
+The env.word['some-word'] function is now the one generated by auto await mode.
+
+Also note that after compilation no one restores the auto await mode to no-wait mode for you.
+
+You trigger that at will and that's it.
+
+Right now i have to play with this more and see how uncomfortable it feels.
+
+For the most part it is quite cool as long as you do not switch it constantly or at all.
+
+But since it's experimental it needs to evolve to something better.
+
+The only way this feature and the runtime environments or any other feature in this language will evolve is by pushing their current implementation, solution or hack to the limits and see how they explode to know the direction that must be taken.
+
+One of the things that pushes the limits a bit is the dom abstraction feature.
+
+For the browser you can create document object elements and append them to the document.
+
+You have words like document, body, window, head, etc that when evaluated they push the document object, the document.body object the window object, the document.head object, etc.
+
+You have the "element" word which is document.createElement
+
+```js
+env.word.element = () => put(document.createElement(get()))
+```
+
+```oh
+'p element
+```
+
+That would create a <p> element and push it on the stack, you can use append which is:
+
+```js
+env.word.append = () => { const [child, parent] = get2(); parent.appendChild(child) }
+```
+
+Although a bit different because it works with lists of children also
+
+```oh
+p element body append
+```
+
+That would append a <p> element to the document.body
+
+You can just say "to-body" which is a shorthand for "body append"
+
+```oh
+p element to-body
+```
+
+But there is a cooler abstraction to create elements using lists with the word "dom"
+
+The word "dom" is not immediate, it's just a normal word that executes at runtime.
+
+At runtime it takes a list from the stack and iterates it.
+
+It does a lot of stuff, so the function is a bit big to put it here, but it mainly takes a list or nested lists as some sort of declarative html s-expressions.
+
+```oh
+(p "oh...") dom to-body
+```
+
+That would create a p element, set its textContent to "oh..." and append it to the body.
+
+You can set ids, class names, arbitrary properties, event handlers and associate properties of that element and create a word that will push this element on the stack.
+
+You can also nest elements and those elements will become children of the outer elements.
+
+```oh
+(main
+ (h1 #the-title .heading "This is a title with the id the-title and the class heading")
+ (p "Please type your feelings here")
+ (input -type text -placeholder "I am feeling fine.")) dom to-body
+```
+
+That would create a <main> element with the h1, p and input elements as children.
+
+The h1 will have the id set to "the-title" since the #the-title is a directive to set an id.
+
+It will also have the class "heading" since the .heading is a directive to add a class
+
+The strings in quotes will be appended to their textContent
+
+The directives starting with a dash like "-type" and "-placeholder" will set a property on that element with the value being the next element.
+
+So the <input> element will have a type and placeholder property like:
+
+```html
+<input type="text" placeholder="I am feeling fine.">
+```
+
+There is a way to create or attach handlers to events.
+
+```oh
+(button "Please do not click me" @click ("I told you not to click" log)) dom to-body
+```
+
+That will register an eventListener on that button element that will execute that code in the list.
+
+The @ directive takes the next element and it expects it to be a list or a function.
+
+If it is a function is just attaches it to the listener like
+
+```js
+button.addEventListener('click', that_function)
+```
+
+If it is a list it will compile that list as a sequence of words.
+
+Before compiling it will do something like:
+
+```js
+let event
+const e = make_env(env)
+e.word.event = () => put(event)
+```
+
+Now it compiles that list iterating it and calling compile element, but before doing that it sets e to be the current environment for that compilation so every element in that list gets compiled in that "e" environment.
+
+Note how it's creating a lexical variable in js named "event" and then registering a word in that "e" environment.
+
+This means that when compiling the elements of that list inside that environment if that list contains the word "event" it will find it and compile it properly.
+
+Then it registers the event handler like:
+
+```js
+button.addEventListener('click', (ev) => { event = ev; for (let fun of list) { fun() } })
+```
+
+Note how it sets "event" to the event object it receives as argument. That's why it was registering an event word in the environment before compiling the list, so now if the event word executes, since that word was just to push that lexical variable, it will push the event object on the stack.
+
+That means that if you give a list to the @ directive, you can use the event object.
+
+```oh
+(input -type text @change (event.target.value log))
+```
+
+That would print on the console the value of the input element when the onchange event fires.
+
+That dot notation "event.target.value" is fancy syntax sugar provided by compile atom
+
+It's a bridge for using javascript objects.
+
+Shouldn't be explained in the middle of the explanation of the "dom" word, but i just introduced it by accident so i should explain it.
+
+The "event.target.value" gets separated in two parts: "event" and "target.value"
+
+The first part gets compiled and later evaluated and it should push an object on the stack.
+
+In this case event was compiled in that list and the @ directive injected the event word in the environment the list was compiled so the event word is pushing the event object on the stack.
+
+After that the object gets iterated with the chain of properties "target.value"
+
+And if target.value is a property of that object the value will be pushed on the stack.
+
+The dot notation has more variations which i'll have to explain once i end the explanation of the "dom" word.
+
+The dom word has two more features and both involve generating new words at runtime.
+
+The simplest one is ":name"
+
+If you recall from before ":name" was syntax sugar compile atom provided for delaying a word being generated on the stack.
+
+compile atom would return a function that at runtime will take a value from the stack and create a word named "name" that will push that value on the stack when executed.
+
+The dom word reuses the syntax because it helps to remember that dom is a runtime word and if it generates a word it will do so at runtime.
+
+That means that at compile time you will not be able to use that word unless you use the delayed lookup "name:"
+
+Instead of associating a stack value at runtime, the dom word associates this name with the element it is generating.
+
+```oh
+(button :my-button "Hi, I am a button") dom to-body
+```
+
+That would generate a word named "my-button" at runtime, that when executed will push the button dom object on the stack.
+
+But since dom cannot do that until runtime because it is not an immediate word, the compiler has no way to compile that word unless we use the delayed lookup.
+
+So if we want to use that my-button word it has to be with "my-button:" to make compile atom delay the lookup and execution of that word until runtime
+
+The last feature of the dom word is the reader and writer directives.
+
+They are similar to the :name thingy but instead of associating a word to the dom object, they create a getter or setter for a property of that element.
+
+```oh
+(p writer to-p text-content "I initially have some boring text") dom to-body
+
+"But now look how cool my text is :D" to-p:
+```
+
+The writer directive reads a name for the word to generate and a property for the dom to associate it with.
+
+In this case it is creating a word named "to-p" that when executed will get a value from the stack and set the textContent of that element with it.
+
+So the last line is pushing a string on the stack and then calling "to-p:" (note the delayed lookup) and that word just updates the textContent of the p element with that string.
+
+Since again the dom is a runtime word not an immediate one, there is no way for the dom word to generate words at compile time.
+
+Any word dom or any other abstraction generates at runtime will be accessed by delayed lookup unless we are compiling things at runtime.
+
+The reader directive is similar but is the getter part, instead of setting the value it pushes the value of that property on the stack when evaluated.
+
+Those words are going to be created in the current environment at the time the dom word executes.
+
+Since that will always be at runtime, the block word can provide a runtime environment where the dom word can generate words.
+
+```oh
+block
+(p :the-p-element "Hi...") dom to-body
+end
+```
+
+The word "the-p-element" will then be created in the new environment block generates at runtime.
+
+That means that if we use the delayed lookup for that word outside that block we will never find it.
+
+It also means that if the @ directive receives a list it will compile that list in an environment that inherits from the block environment.
+
+
+The word defun is quite similar to the block word, it does the same but instead of executing that code it creates a word at compile time that does the same block does.
+
+```oh
+defun some-name
+1 2 3
+end
+some-name
+```
+
+Is equivalent to:
+
+```oh
+block
+1 2 3
+end
+```
+
+The only difference is that a word will be available to reuse that block.
+
+That word when executed will create a new environment at runtime every time is executed, then execute the code in that environment at runtime.
 
 
 
