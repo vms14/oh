@@ -46,10 +46,6 @@ It is a playground for my mind and a training process to teach me about almost a
 
 I can test any idea without friction, integrate it to the language, combine it, drop it or evolve it.
 
-While showing this interpreter to chatgpt and discussing about it, it told me that it's not really reflecting my understanding, but how i deal with uncertainty and that also mirrors my own learning procedure.
-
-That in a way, it mirrors how i think.
-
 For me this interpreter is just a playground for ideas.
 
 An idea can be tested immediately by just creating a word definition, either in the language itself or in javascript.
