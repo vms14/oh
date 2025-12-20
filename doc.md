@@ -2429,6 +2429,87 @@ But we can also import utilities in a module to help create more definitions or 
 
 The cool part is when we create immediate words that implement random syntax for a specific abstraction i guess.
 
+I had to explain the dot notation:
+
+The dot notation has a setter and getter sugar provided by compile atom
+
+If there is a token with dots in it, compile atom takes it as dot notation.
+
+The setter is when you append a "!" character at the end of a token with dot notation.
+
+It is just some syntax sugar to use object properties and set them, a layer for js interoperation.
+
+```oh
+(1 2 3) .0
+```
+
+".0" is equivalent to:
+
+```js
+put(get()[0])
+```
+
+When compile atom finds a token that starts with a dot, it returns a function that will take an element from the stack and access a property on it, pushing that value on the stack.
+
+So in this case it will take the list from the stack and return the first element, the number 1
+
+If instead we add a "!" character we will be mutating the value.
+
+```oh
+24 (1 2 3) .0!
+```
+
+That will replace the 1 for 24 in that list.
+
+The list will be [24 2 3] instead of [1 2 3]
+
+The dot notation can contain multiple properties
+
+```oh
+.style.color
+```
+
+That will take an object from the stack and try to access the style.color property of that object
+
+The dot notation has a variation for when the token has dots but does not start with a dot.
+
+```oh
+body.style.color
+```
+
+It will evaluate the word "body" by compiling it first and returning a function that will execute it then access the property of whatever this word pushes on the stack.
+
+The words document, body, head, window, etc, are already defined and they push the javascript associated objects on the stack.
+
+This allows us to set the properties of an element.
+
+```oh
+'red document.body.style.color!
+```
+
+```oh
+'p element bind p
+p to-body
+"Hi, i am a <p> element, how are you?" p.text-content!
+```
+
+Note the text-content instead of textContent
+
+The dot notation will translate kebab case to camel case
+
+It only does that for the properties, not the first word, since the first word is evaluated as a word in the language.
+
+```oh
+: some-word
+  'p element
+  dup to-body
+;
+"Hi" some-word.text-content!
+```
+
+
+
+
 
 
 
