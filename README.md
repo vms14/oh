@@ -53,6 +53,7 @@ node oh.js
 
 The bots generated random and useless documentation from a file where i explain the interpreter
 * [Food for bots](https://github.com/vms14/oh/blob/main/doc.md)
+* [The same thing, but in pdf](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/doc.pdf)
 
 You are not meant to read this since it's not readable and wasn't supposed to be read by mortals.
 
