@@ -47,9 +47,9 @@ node oh.js
 
 ## AI generated documentation:
 
-* [Overview](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/overview.txt)
-* [Word list](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/words.txt)
-* [Internals](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/internals.txt)
+* [Overview](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/tutorial.md)
+* [Word list](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/ref.md)
+* [Explanation](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/explanation.txt)
 
 ### Video:
  [![Video oh](https://img.youtube.com/vi/ErPK1BeA27c/0.jpg)](https://youtu.be/ErPK1BeA27c)
