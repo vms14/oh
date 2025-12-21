@@ -1576,7 +1576,21 @@ w.iterate = () =>
   }
 }
 
+w.words = () =>
+{
+  const words = Object.keys(env.word)
+  if (env.parent)
+  {
+    let e = env
+    while (e = e.parent)
+    {
+      words.push(...Object.keys(e.word))
+    }
+  }
+  const word_list = words.sort()
+  put(() => put(word_list))
+}
 w['@'] = () => put(interpolate_list(get()))
 immediate(0, ': wait no-wait defun trace no-trace module import import-all declare ---')
-immediate(1, 'block lambda bind increment { ( " ` if promise interval timeout case')
+immediate(1, 'block lambda bind increment { ( " ` if promise interval timeout case words')
 init()
