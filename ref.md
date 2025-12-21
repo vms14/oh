@@ -123,7 +123,7 @@ Immediate 1	1	Executes at compile time and must push a function onto the stack. 
 Literals are fundamental values like numbers, strings, and lists. In oh, they are created by immediate 1 words that generate and return functions.
 
 * Numbers: Any token that matches the number regex (e.g., 42, -3.14) is handled by compile_atom. It returns a function that, when executed at runtime, will push the parsed numeric value onto the stack.
-* Strings: The " and \`` words are powerful immediate 1string readers. When encountered, they consume all characters from the source stream until a matching closing delimiter is found. They can process escape sequences (e.g.,\n, \t) and return a function that, when executed at runtime, pushes the resulting string onto the stack. This mechanism is more robust than the simple 'prefix handled bycompile_atom`.
+* Strings: The " and \` words are powerful immediate 1string readers. When encountered, they consume all characters from the source stream until a matching closing delimiter is found. They can process escape sequences (e.g.,\n, \t) and return a function that, when executed at runtime, pushes the resulting string onto the stack. This mechanism is more robust than the simple 'prefix handled bycompile_atom`.
 * Lists: The ( word is an immediate 1 word that reads and compiles all subsequent tokens until a matching ) is found. It returns a function that, when executed, pushes a fresh copy of the compiled list of values onto the stack. This copy-on-execution behavior is crucial, as it prevents mutations to a list in one part of the code from affecting another part that uses the same literal definition.
 
 With these fundamentals, we can now examine how oh manages state through its binding system.
