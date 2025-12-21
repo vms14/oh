@@ -4,7 +4,6 @@
 
 [![](https://img.youtube.com/vi/Jt6sSC3triQ/0.jpg)](https://youtu.be/Jt6sSC3triQ)
 
-![[]](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/repl.gif)
 
 ```oh
 1 2 +
