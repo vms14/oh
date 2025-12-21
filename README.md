@@ -6,6 +6,8 @@
 1 2 +
 ```
 
+![](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/repl.gif)
+
 It's a javascript file that you can download from this repository
 
 https://raw.githubusercontent.com/vms14/oh/refs/heads/main/oh.js
