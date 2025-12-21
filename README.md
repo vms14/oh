@@ -2,11 +2,13 @@
 
 * a stack based language using postfix notation
 
+![](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/repl.gif)
+
 ```oh
 1 2 +
 ```
 
-![](https://raw.githubusercontent.com/vms14/oh/refs/heads/main/repl.gif)
+
 
 It's a javascript file that you can download from this repository
 
