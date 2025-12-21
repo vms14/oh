@@ -2507,6 +2507,186 @@ It only does that for the properties, not the first word, since the first word i
 "Hi" some-word.text-content!
 ```
 
+The word set can also work with dot notation since it is a mutator.
+
+```js
+mutator('increment-by-one', (slot, property) => slot[property]++)
+mutator('decrement-by-one', (slot, property) => slot[property]--)
+mutator('increment', (slot, property) => slot[property] += get())
+mutator('decrement', (slot, property) => slot[property] -= get())
+mutator('set', (slot, property) => slot[property] = get())
+```
+
+A mutator is just the unification of multiple ways to set a value.
+
+```oh
+24 set some-binding
+24 set some-binding:
+24 set object.property.subproperty
+24 object set .property.subproperty
+```
+
+The mutator function handles all those possibilities and executes the provided code which it calls giving the object and property.
+
+When compile element calls the immediate 1 word set, or any other word registered as a mutator since the mutator function in js generates that word and sets it as immediate 1, the mutator function executes, which reads the next token calling read_word() and determines what function to push on the stack for compile element to give to its caller.
+
+What compile element calls when executes the set word is a function the mutator function has registered that will check what the token is and dispatch a function depending on whether is dot notation or binding or delayed binding.
+
+for example in
+
+```oh
+24 set some-binding
+```
+
+The mutator registered function executes at compile time and reads "some-binding" it checks at compile time that this word exists and is in fact a binding (has a value property) then returns a function on the stack that will call the code provided as argument
+
+```js
+mutator('set', (slot, property) => slot[property] = get())
+```
+
+The mutator captures this function provided for set and in the case of "set some-binding" it will call this function with:
+
+```js
+const the_set_provided_function = (slot, property) => slot[property] = get()
+the_set_provided_function(binding, 'value')
+```
+
+Being the binding, the "some-binding" word that found at compile time.
+
+The code registered for set will receive (binding, 'value) as arguments
+
+And it will just do
+
+```js
+binding.value = get()
+```
+
+Which is the same function bind returns as the setter.
+
+If the mutator function registered for set reads "some-name:" with the ":" at the end it compiles a delayed binding.
+
+The function returned by set in this case will search that word at runtime and set it with a value on the stack.
+
+The code that set provided will still see (object, property) as arguments.
+
+The object and property values will be also (binding, 'value'), the binding just was searched at runtime instead of compile time.
+
+For dot notation the mutator function will return a function that will traverse the chain of properties and give the code provided for the set function the last object and the last property.
+
+For example:
+
+```oh
+'red set body.style.color
+```
+
+```js
+the_set_provided_function(style, 'color')
+// style.color = get()
+```
+
+If the token starts with a dot then the object will be taken from the stack exactly like the dot notation provided by compile atom since it's the same interface.
+
+```oh
+'red body set .style.color
+```
+
+A mutator is just a way to unify all those four possibilities
+
+It means that any mutator word will have the same interface:
+
+```oh
+24 increment some-value
+24 increment player.x
+24 player increment .x
+```
+
+```oh
+increment-by-one some-value
+```
+
+Note increment-by-one does not need a value from the stack except for the object when the token starts with a dot.
+
+```oh
+player increment-by-one .x
+```
+
+compile atom uses the same function the mutator uses for dot notation so the interface is the same.
+
+But compile atom only provides a way to access and set a property while the mutators can be a specialized setter.
+
+The word "set" is equivalent to the dot notation syntax compile atom provides when it ends with a "!"
+
+```oh
+24 set player.x
+24 player.x!
+
+'red body.style.color!
+'red set body.style.color
+```
+
+It has the same effect.
+
+But compile atom does not provide "+!" or similar, that is provided by increment and decrement words.
+
+The if word is an immediate 1 word.
+
+It reads 3 blocks of code. One for the test code, other for the true branch and an optional one for the false branch
+
+```oh
+if 1 then
+ do-something
+else
+ do-something-else
+end
+```
+
+The code between "if" and "then" is the test code.
+
+You can put arbitrary code there, it should leave a value on the stack that the if will use as the flag for true or false.
+
+The code between "then" and "end" is the code that will execute.
+
+By default the code is for the true branch unless you put the "else" token which will make the if word start compiling the code for the false branch.
+
+All three blocks can be empty including the test code.
+
+If the test code is empty the if word will execute it anyways at runtime and take a value from the stack.
+
+That means that if is empty the value will come from the stack.
+
+```oh
+: is-true?
+  if then
+   "is true"
+  else
+   "is false"
+  end
+  log
+;
+
+1 is-true?
+```
+
+The else token is optional
+
+```oh
+if 1 then "this always executes" end
+```
+
+The if word will read until the "then" token and then until the "end" token.
+
+If the else token is found it will also compile code for the else branch.
+
+It returns a function that when executed will execute the code for the test (the code between if and then), then take an element from the stack and use that to check for truth, then evaluate the true branch code or the else branch code depending on that value.
+
+So the if word is an immediate 1 word that returns this function to compile element by pushing it on the stack after compiling those three blocks.
+
+```js
+put(() => { test(); if (get()) { true_code() } else { false_code() } })
+```
+
+And that's what ends into the compilation array.
+
 
 
 
