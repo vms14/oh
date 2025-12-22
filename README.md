@@ -12,7 +12,7 @@ It's a javascript file that you can download from this repository
 
 https://raw.githubusercontent.com/vms14/oh/refs/heads/main/oh.js
 
-Or use jsdelivr:
+Or jsdelivr:
 
 https://cdn.jsdelivr.net/gh/vms14/oh@main/oh.js
 
@@ -34,7 +34,7 @@ node oh.js
 <!DOCTYPE html>
 <html>
  <head>
-  <script src="https://cdn.jsdelivr.net/gh/vms14/oh@0.0/oh.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/vms14/oh@main/oh.js"></script>
  </head>
  <body>
   <oh> (p "oh...") dom to-body </oh>
