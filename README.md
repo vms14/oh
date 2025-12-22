@@ -12,6 +12,11 @@ It's a javascript file that you can download from this repository
 
 https://raw.githubusercontent.com/vms14/oh/refs/heads/main/oh.js
 
+Releases will be automatically available on jsdelivr:
+
+https://cdn.jsdelivr.net/gh/vms14/oh@0.0/oh.js
+
+
 ## Usage:
 
 * In node it launches a read eval print loop that prints the contents of the stack
