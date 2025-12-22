@@ -1,4 +1,14 @@
 --- I thank God for allowing me to program.
 
 
+: oh 1 2 3 ;
+
+oh
+
+r
+
 ':D log
+
+: more-random-code + + ;
+
+1
