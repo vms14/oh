@@ -728,6 +728,7 @@ function browser ()
           const res = await fetch(src)
           if (res.ok)
           {
+            console.log(await res.text())
             interpret_string(await res.text())
           }
           else
