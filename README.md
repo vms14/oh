@@ -2,8 +2,7 @@
 
 * a stack based language using postfix notation
 
-[![](https://img.youtube.com/vi/Jt6sSC3triQ/0.jpg)](https://youtu.be/Jt6sSC3triQ)
-
+[![](https://img.youtube.com/vi/SeW8DVK2bbE/0.jpg)](https://youtu.be/SeW8DVK2bbE)
 
 ```oh
 1 2 +
