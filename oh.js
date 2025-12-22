@@ -723,14 +723,22 @@ function browser ()
       const src = oh.getAttribute('src')
       if (src)
       {
-        const res = await fetch(src)
-        if (res.ok)
+        try
         {
-          interpret_string(await res.text())
+          const res = await fetch(src)
+          if (res.ok)
+          {
+            interpret_string(await res.text())
+          }
+          else
+          {
+            console.error('failed to load', src)
+          }
         }
-        else
+        catch (e)
         {
-          console.error('failed to load', src)
+          console.error(e)
+          return
         }
       }
       const str = oh.textContent.trim()
