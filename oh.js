@@ -590,6 +590,8 @@ function browser ()
     })
   }
   w.dom = () => put(dom(get()))
+  w.debug = debug
+  immediate(0, 'debug')
   immediate(1, 'handler')
   function dom (list)
   {
@@ -716,6 +718,61 @@ function browser ()
     }
     return element
   }
+  function debug ()
+  {
+    const src = source
+    let ptr = pointer
+    const output_element = document.createElement('article')
+    output_element.classList.add('output')
+    document.body.appendChild(output_element)
+    const output_label = document.createElement('label')
+    output_label.textContent = 'Output:'
+    output_element.appendChild(output_label)
+    const old_log = console.log.bind(console)
+    document.body.appendChild(document.createElement('hr'))
+    const source_output = document.createElement('article')
+    document.body.appendChild(source_output)
+    const source_label = document.createElement('label')
+    source_label.textContent = 'Source code:'
+    source_output.appendChild(source_label)
+    const source_element = document.createElement('p')
+    source_element.textContent = source.substr(pointer, 100)
+    source_output.appendChild(source_element)
+    
+    let words = []
+    let word_pointer = 0
+    const old_read = read_word
+    read_word = () => {}
+
+    console.log = (...x) =>
+    {
+      const p = document.createElement('p')
+      p.textContent = x.map(x => typeof x === 'string'? x : JSON.stringify(x)).join(' ')
+      output_element.appendChild(p)
+      scrollTo(0, output_element.scrollHeight)
+    }
+    document.body.addEventListener('keydown', (event) =>
+    {
+      const key = event.key
+      if (key === 'a')
+      {
+        console.log('oh')
+      }
+      else if (key === 'd')
+      {
+        next_word()
+      }
+    })
+    function next_word ()
+    {
+      source = src
+      pointer = ptr
+      const word = old_read()
+      ptr = pointer
+      console.log(word)
+      source_element.textContent = src.substr(pointer, 100)
+    }
+  }
   async function load_scripts ()
   {
     for (let oh of [...document.getElementsByTagName('oh')])
@@ -728,7 +785,6 @@ function browser ()
           const res = await fetch(src)
           if (res.ok)
           {
-            console.log(await res.text())
             interpret_string(await res.text())
           }
           else
